@@ -90,6 +90,11 @@ static inline bool operator<(const OptTable::Info &I, const char *Name) {
   return StrCmpOptionNameIgnoreCase(I.Name, Name) < 0;
 }
 
+static inline bool operator<(const char *Name, const OptTable::Info &I) {
+  return StrCmpOptionNameIgnoreCase(Name, I.Name) < 0;
+}
+
+
 } // end namespace opt
 } // end namespace llvm
 

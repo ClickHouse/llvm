@@ -804,6 +804,7 @@ void IntrinsicEmitter::EmitIntrinsicToBuiltinMap(
   OS << "      return strncmp(getName(), RHS.data(), RHS.size()) < 0;\n";
   OS << "    }\n";
   OS << "  };\n";
+  OS << "  inline bool operator<(StringRef LHS, const BuiltinEntry &) { return strncmp(getName(), LHS.data(), LHS.size()) > 0; }\n";
 
   OS << "  StringRef TargetPrefix(TargetPrefixStr);\n\n";
 
