@@ -762,8 +762,8 @@ if(MSVC)
 endif()
 
 # Provide public options to globally control RTTI and EH
-option(LLVM_ENABLE_EH "Enable Exception handling" OFF)
-option(LLVM_ENABLE_RTTI "Enable run time type information" OFF)
+option(LLVM_ENABLE_EH "Enable Exception handling" ON)
+option(LLVM_ENABLE_RTTI "Enable run time type information" ON)
 if(LLVM_ENABLE_EH AND NOT LLVM_ENABLE_RTTI)
   message(FATAL_ERROR "Exception handling requires RTTI. You must set LLVM_ENABLE_RTTI to ON")
 endif()
