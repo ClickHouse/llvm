@@ -22,6 +22,8 @@ if(POLICY CMP0068)
   set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 endif()
 
+add_definitions(-Wno-unused-parameter -Wno-non-virtual-dtor -U_LIBCPP_DEBUG)
+
 if(NOT DEFINED LLVM_VERSION_MAJOR)
   set(LLVM_VERSION_MAJOR 7)
 endif()
@@ -214,32 +216,6 @@ set(PACKAGE_BUGREPORT "https://bugs.llvm.org/")
 
 set(BUG_REPORT_URL "${PACKAGE_BUGREPORT}" CACHE STRING
   "Default URL where bug reports are to be submitted.")
-
-# Configure CPack.
-set(CPACK_PACKAGE_INSTALL_DIRECTORY "LLVM")
-set(CPACK_PACKAGE_VENDOR "LLVM")
-set(CPACK_PACKAGE_VERSION_MAJOR ${LLVM_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${LLVM_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${LLVM_VERSION_PATCH})
-set(CPACK_PACKAGE_VERSION ${PACKAGE_VERSION})
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.TXT")
-set(CPACK_NSIS_COMPRESSOR "/SOLID lzma \r\n SetCompressorDictSize 32")
-if(WIN32 AND NOT UNIX)
-  set(CPACK_PACKAGE_INSTALL_REGISTRY_KEY "LLVM")
-  set(CPACK_PACKAGE_ICON "${CMAKE_CURRENT_SOURCE_DIR}\\\\cmake\\\\nsis_logo.bmp")
-  set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}\\\\cmake\\\\nsis_icon.ico")
-  set(CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_SOURCE_DIR}\\\\cmake\\\\nsis_icon.ico")
-  set(CPACK_NSIS_MODIFY_PATH "ON")
-  set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL "ON")
-  set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
-    "ExecWait '$INSTDIR/tools/msbuild/install.bat'")
-  set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
-    "ExecWait '$INSTDIR/tools/msbuild/uninstall.bat'")
-  if( CMAKE_CL_64 )
-    set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
-  endif()
-endif()
-include(CPack)
 
 # Sanity check our source directory to make sure that we are not trying to
 # generate an in-source build (unless on MSVC_IDE, where it is ok), and to make
