@@ -3736,6 +3736,9 @@ struct NeonIntrinsicInfo {
     return BuiltinID < TE.BuiltinID;
   }
 };
+inline bool operator<(unsigned RHSBuiltinID, const NeonIntrinsicInfo & info) {
+  return RHSBuiltinID < info.BuiltinID;
+}
 } // end anonymous namespace
 
 #define NEONMAP0(NameBase) \
