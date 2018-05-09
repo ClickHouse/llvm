@@ -9,6 +9,7 @@ Instead you can simply install packages
 But when using packages from the system, a few downsides exist:
 - it requires to use fresh enough version of Ubuntu for builds;
 - the packages are usually outdated;
+- the packages may lack static libraries;
 - the packages may change in uncontrolled way and your build becomes irreproducible;
 - different OS have their own combinations of packages - it's very difficult to follow;
 - the packages was compiled with fixed compile flags and fixed ABI, you cannot change it;
