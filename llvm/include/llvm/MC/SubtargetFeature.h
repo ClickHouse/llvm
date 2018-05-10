@@ -67,13 +67,6 @@ struct SubtargetFeatureKV {
   }
 };
 
-/// Clang 7 with debug variant of libc++ cannot compile itself without this patch.
-inline bool operator<(const StringRef & s, const SubtargetFeatureKV & feature)
-{
-    return s < StringRef(feature.Key);
-}
-
-
 //===----------------------------------------------------------------------===//
 
 /// Used to provide key value pairs for CPU and arbitrary pointers.
