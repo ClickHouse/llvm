@@ -80,14 +80,6 @@ struct SubtargetInfoKV {
   }
 };
 
-
-/// Clang 7 with debug variant of libc++ cannot compile itself without this patch.
-inline bool operator<(const StringRef & s, const SubtargetInfoKV & info)
-{
-    return s < StringRef(info.Key);
-}
-
-
 //===----------------------------------------------------------------------===//
 
 /// Manages the enabling and disabling of subtarget specific features.
