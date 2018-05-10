@@ -22,7 +22,12 @@ if(POLICY CMP0068)
   set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 endif()
 
-add_definitions(-Wno-unused-parameter -Wno-non-virtual-dtor -U_LIBCPP_DEBUG)
+add_definitions(
+    -Wno-unused-parameter
+    -Wno-non-virtual-dtor
+    -U_LIBCPP_DEBUG # It cannot compile with debug libc++
+    -g0             # To lower object size
+)
 
 if(NOT DEFINED LLVM_VERSION_MAJOR)
   set(LLVM_VERSION_MAJOR 7)
