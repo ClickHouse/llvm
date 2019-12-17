@@ -1,9 +1,8 @@
 //===- ObjCARCAPElim.cpp - ObjC ARC Optimization --------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 /// \file
@@ -103,10 +102,12 @@ bool ObjCARCAPElim::OptimizeBB(BasicBlock *BB) {
       // zap the pair.
       if (Push && cast<CallInst>(Inst)->getArgOperand(0) == Push) {
         Changed = true;
-        DEBUG(dbgs() << "ObjCARCAPElim::OptimizeBB: Zapping push pop "
-                        "autorelease pair:\n"
-                        "                           Pop: " << *Inst << "\n"
-                     << "                           Push: " << *Push << "\n");
+        LLVM_DEBUG(dbgs() << "ObjCARCAPElim::OptimizeBB: Zapping push pop "
+                             "autorelease pair:\n"
+                             "                           Pop: "
+                          << *Inst << "\n"
+                          << "                           Push: " << *Push
+                          << "\n");
         Inst->eraseFromParent();
         Push->eraseFromParent();
       }

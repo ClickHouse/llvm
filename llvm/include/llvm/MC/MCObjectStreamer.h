@@ -1,9 +1,8 @@
 //===- MCObjectStreamer.h - MCStreamer Object File Interface ----*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -39,16 +38,25 @@ class MCObjectStreamer : public MCStreamer {
   bool EmitEHFrame;
   bool EmitDebugFrame;
   SmallVector<MCSymbol *, 2> PendingLabels;
+  struct PendingMCFixup {
+    const MCSymbol *Sym;
+    MCFixup Fixup;
+    MCDataFragment *DF;
+    PendingMCFixup(const MCSymbol *McSym, MCDataFragment *F, MCFixup McFixup)
+        : Sym(McSym), Fixup(McFixup), DF(F) {}
+  };
+  SmallVector<PendingMCFixup, 2> PendingFixups;
 
   virtual void EmitInstToData(const MCInst &Inst, const MCSubtargetInfo&) = 0;
   void EmitCFIStartProcImpl(MCDwarfFrameInfo &Frame) override;
   void EmitCFIEndProcImpl(MCDwarfFrameInfo &Frame) override;
   MCSymbol *EmitCFILabel() override;
   void EmitInstructionImpl(const MCInst &Inst, const MCSubtargetInfo &STI);
+  void resolvePendingFixups();
 
 protected:
   MCObjectStreamer(MCContext &Context, std::unique_ptr<MCAsmBackend> TAB,
-                   raw_pwrite_stream &OS,
+                   std::unique_ptr<MCObjectWriter> OW,
                    std::unique_ptr<MCCodeEmitter> Emitter);
   ~MCObjectStreamer();
 
@@ -73,7 +81,9 @@ public:
 
   /// Get a data fragment to write into, creating a new one if the current
   /// fragment is not a data fragment.
-  MCDataFragment *getOrCreateDataFragment();
+  /// Optionally a \p STI can be passed in so that a new fragment is created
+  /// if the Subtarget differs from the current fragment.
+  MCDataFragment *getOrCreateDataFragment(const MCSubtargetInfo* STI = nullptr);
   MCPaddingFragment *getOrCreatePaddingFragment();
 
 protected:
@@ -85,10 +95,11 @@ protected:
   /// will be used as a symbol offset within the fragment.
   void flushPendingLabels(MCFragment *F, uint64_t FOffset = 0);
 
-  void addFragmentAtoms();
-
 public:
   void visitUsedSymbol(const MCSymbol &Sym) override;
+
+  /// Create a dummy fragment to assign any pending labels.
+  void flushPendingLabels() { flushPendingLabels(nullptr); }
 
   MCAssembler &getAssembler() { return *Assembler; }
   MCAssembler *getAssemblerPtr() override;
@@ -104,8 +115,7 @@ public:
   void EmitSLEB128Value(const MCExpr *Value) override;
   void EmitWeakReference(MCSymbol *Alias, const MCSymbol *Symbol) override;
   void ChangeSection(MCSection *Section, const MCExpr *Subsection) override;
-  void EmitInstruction(const MCInst &Inst, const MCSubtargetInfo &STI,
-                       bool = false) override;
+  void EmitInstruction(const MCInst &Inst, const MCSubtargetInfo &STI) override;
 
   /// Emit an instruction to a special fragment, because this instruction
   /// can change its size during relaxation.
@@ -158,7 +168,8 @@ public:
   void EmitGPRel32Value(const MCExpr *Value) override;
   void EmitGPRel64Value(const MCExpr *Value) override;
   bool EmitRelocDirective(const MCExpr &Offset, StringRef Name,
-                          const MCExpr *Expr, SMLoc Loc) override;
+                          const MCExpr *Expr, SMLoc Loc,
+                          const MCSubtargetInfo &STI) override;
   using MCStreamer::emitFill;
   void emitFill(const MCExpr &NumBytes, uint64_t FillValue,
                 SMLoc Loc = SMLoc()) override;
@@ -166,13 +177,18 @@ public:
                 SMLoc Loc = SMLoc()) override;
   void EmitFileDirective(StringRef Filename) override;
 
+  void EmitAddrsig() override;
+  void EmitAddrsigSym(const MCSymbol *Sym) override;
+
   void FinishImpl() override;
 
   /// Emit the absolute difference between two symbols if possible.
   ///
   /// Emit the absolute difference between \c Hi and \c Lo, as long as we can
   /// compute it.  Currently, that requires that both symbols are in the same
-  /// data fragment.  Otherwise, do nothing and return \c false.
+  /// data fragment and that the target has not specified that diff expressions
+  /// require relocations to be emitted. Otherwise, do nothing and return
+  /// \c false.
   ///
   /// \pre Offset of \c Hi is greater than the offset \c Lo.
   void emitAbsoluteSymbolDiff(const MCSymbol *Hi, const MCSymbol *Lo,

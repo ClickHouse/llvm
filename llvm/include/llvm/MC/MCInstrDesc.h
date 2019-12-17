@@ -1,9 +1,8 @@
 //===-- llvm/MC/MCInstrDesc.h - Instruction Descriptors -*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -120,6 +119,7 @@ enum Flag {
   HasOptionalDef,
   Pseudo,
   Return,
+  EHScopeReturn,
   Call,
   Barrier,
   Terminator,
@@ -127,12 +127,14 @@ enum Flag {
   IndirectBranch,
   Compare,
   MoveImm,
+  MoveReg,
   Bitcast,
   Select,
   DelaySlot,
   FoldableAsLoad,
   MayLoad,
   MayStore,
+  MayRaiseFPException,
   Predicable,
   NotDuplicable,
   UnmodeledSideEffects,
@@ -148,7 +150,9 @@ enum Flag {
   ExtractSubreg,
   InsertSubreg,
   Convergent,
-  Add
+  Add,
+  Trap,
+  VariadicOpsAreDefs,
 };
 }
 
@@ -243,6 +247,12 @@ public:
 
   /// Return true if the instruction is an add instruction.
   bool isAdd() const { return Flags & (1ULL << MCID::Add); }
+
+  /// Return true if this instruction is a trap.
+  bool isTrap() const { return Flags & (1ULL << MCID::Trap); }
+
+  /// Return true if the instruction is a register to register move.
+  bool isMoveReg() const { return Flags & (1ULL << MCID::MoveReg); }
 
   ///  Return true if the instruction is a call.
   bool isCall() const { return Flags & (1ULL << MCID::Call); }
@@ -374,6 +384,11 @@ public:
   /// additional values.
   bool isConvergent() const { return Flags & (1ULL << MCID::Convergent); }
 
+  /// Return true if variadic operands of this instruction are definitions.
+  bool variadicOpsAreDefs() const {
+    return Flags & (1ULL << MCID::VariadicOpsAreDefs);
+  }
+
   //===--------------------------------------------------------------------===//
   // Side Effect Analysis
   //===--------------------------------------------------------------------===//
@@ -388,6 +403,11 @@ public:
   /// instructions, they may store a modified value based on their operands, or
   /// may not actually modify anything, for example.
   bool mayStore() const { return Flags & (1ULL << MCID::MayStore); }
+
+  /// Return true if this instruction may raise a floating-point exception.
+  bool mayRaiseFPException() const {
+    return Flags & (1ULL << MCID::MayRaiseFPException);
+  }
 
   /// Return true if this instruction has side
   /// effects that are not modeled by other flags.  This does not return true

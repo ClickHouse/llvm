@@ -1,9 +1,8 @@
 //===- CoroFrame.cpp - Builds and manipulates coroutine frame -------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 // This file contains classes used to discover if for a particular value
@@ -19,7 +18,7 @@
 
 #include "CoroInternal.h"
 #include "llvm/ADT/BitVector.h"
-#include "llvm/Analysis/Utils/Local.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Dominators.h"
@@ -49,11 +48,11 @@ public:
   BlockToIndexMapping(Function &F) {
     for (BasicBlock &BB : F)
       V.push_back(&BB);
-    llvm::sort(V.begin(), V.end());
+    llvm::sort(V);
   }
 
   size_t blockToIndex(BasicBlock *BB) const {
-    auto *I = std::lower_bound(V.begin(), V.end(), BB);
+    auto *I = llvm::lower_bound(V, BB);
     assert(I != V.end() && *I == BB && "BasicBlockNumberng: Unknown block");
     return I - V.begin();
   }
@@ -106,8 +105,8 @@ struct SuspendCrossingInfo {
 
     assert(Block[UseIndex].Consumes[DefIndex] && "use must consume def");
     bool const Result = Block[UseIndex].Kills[DefIndex];
-    DEBUG(dbgs() << UseBB->getName() << " => " << DefBB->getName()
-                 << " answer is " << Result << "\n");
+    LLVM_DEBUG(dbgs() << UseBB->getName() << " => " << DefBB->getName()
+                      << " answer is " << Result << "\n");
     return Result;
   }
 
@@ -195,8 +194,8 @@ SuspendCrossingInfo::SuspendCrossingInfo(Function &F, coro::Shape &Shape)
 
   bool Changed;
   do {
-    DEBUG(dbgs() << "iteration " << ++Iteration);
-    DEBUG(dbgs() << "==============\n");
+    LLVM_DEBUG(dbgs() << "iteration " << ++Iteration);
+    LLVM_DEBUG(dbgs() << "==============\n");
 
     Changed = false;
     for (size_t I = 0; I < N; ++I) {
@@ -240,20 +239,20 @@ SuspendCrossingInfo::SuspendCrossingInfo(Function &F, coro::Shape &Shape)
         Changed |= (S.Kills != SavedKills) || (S.Consumes != SavedConsumes);
 
         if (S.Kills != SavedKills) {
-          DEBUG(dbgs() << "\nblock " << I << " follower " << SI->getName()
-                       << "\n");
-          DEBUG(dump("S.Kills", S.Kills));
-          DEBUG(dump("SavedKills", SavedKills));
+          LLVM_DEBUG(dbgs() << "\nblock " << I << " follower " << SI->getName()
+                            << "\n");
+          LLVM_DEBUG(dump("S.Kills", S.Kills));
+          LLVM_DEBUG(dump("SavedKills", SavedKills));
         }
         if (S.Consumes != SavedConsumes) {
-          DEBUG(dbgs() << "\nblock " << I << " follower " << SI << "\n");
-          DEBUG(dump("S.Consume", S.Consumes));
-          DEBUG(dump("SavedCons", SavedConsumes));
+          LLVM_DEBUG(dbgs() << "\nblock " << I << " follower " << SI << "\n");
+          LLVM_DEBUG(dump("S.Consume", S.Consumes));
+          LLVM_DEBUG(dump("SavedCons", SavedConsumes));
         }
       }
     }
   } while (Changed);
-  DEBUG(dump());
+  LLVM_DEBUG(dump());
 }
 
 #undef DEBUG_TYPE // "coro-suspend-crossing"
@@ -379,7 +378,7 @@ static StructType *buildFrameType(Function &F, coro::Shape &Shape,
   StructType *FrameTy = StructType::create(C, Name);
   auto *FramePtrTy = FrameTy->getPointerTo();
   auto *FnTy = FunctionType::get(Type::getVoidTy(C), FramePtrTy,
-                                 /*IsVarArgs=*/false);
+                                 /*isVarArg=*/false);
   auto *FnPtrTy = FnTy->getPointerTo();
 
   // Figure out how wide should be an integer type storing the suspend index.
@@ -403,6 +402,7 @@ static StructType *buildFrameType(Function &F, coro::Shape &Shape,
     if (CurrentDef == Shape.PromiseAlloca)
       continue;
 
+    uint64_t Count = 1;
     Type *Ty = nullptr;
     if (auto *AI = dyn_cast<AllocaInst>(CurrentDef)) {
       Ty = AI->getAllocatedType();
@@ -414,11 +414,18 @@ static StructType *buildFrameType(Function &F, coro::Shape &Shape,
           Padder.addType(PaddingTy);
         }
       }
+      if (auto *CI = dyn_cast<ConstantInt>(AI->getArraySize()))
+        Count = CI->getValue().getZExtValue();
+      else
+        report_fatal_error("Coroutines cannot handle non static allocas yet");
     } else {
       Ty = CurrentDef->getType();
     }
     S.setFieldIndex(Types.size());
-    Types.push_back(Ty);
+    if (Count == 1)
+      Types.push_back(Ty);
+    else
+      Types.push_back(ArrayType::get(Ty, Count));
     Padder.addType(Ty);
   }
   FrameTy->setBody(Types);
@@ -471,11 +478,12 @@ static Instruction *splitBeforeCatchSwitch(CatchSwitchInst *CatchSwitch) {
 //
 static Instruction *insertSpills(SpillInfo &Spills, coro::Shape &Shape) {
   auto *CB = Shape.CoroBegin;
+  LLVMContext &C = CB->getContext();
   IRBuilder<> Builder(CB->getNextNode());
-  PointerType *FramePtrTy = Shape.FrameTy->getPointerTo();
+  StructType *FrameTy = Shape.FrameTy;
+  PointerType *FramePtrTy = FrameTy->getPointerTo();
   auto *FramePtr =
       cast<Instruction>(Builder.CreateBitCast(CB, FramePtrTy, "FramePtr"));
-  Type *FrameTy = FramePtrTy->getElementType();
 
   Value *CurrentValue = nullptr;
   BasicBlock *CurrentBlock = nullptr;
@@ -492,17 +500,41 @@ static Instruction *insertSpills(SpillInfo &Spills, coro::Shape &Shape) {
   if (Shape.PromiseAlloca)
     Allocas.emplace_back(Shape.PromiseAlloca, coro::Shape::PromiseField);
 
+  // Create a GEP with the given index into the coroutine frame for the original
+  // value Orig. Appends an extra 0 index for array-allocas, preserving the
+  // original type.
+  auto GetFramePointer = [&](uint32_t Index, Value *Orig) -> Value * {
+    SmallVector<Value *, 3> Indices = {
+        ConstantInt::get(Type::getInt32Ty(C), 0),
+        ConstantInt::get(Type::getInt32Ty(C), Index),
+    };
+
+    if (auto *AI = dyn_cast<AllocaInst>(Orig)) {
+      if (auto *CI = dyn_cast<ConstantInt>(AI->getArraySize())) {
+        auto Count = CI->getValue().getZExtValue();
+        if (Count > 1) {
+          Indices.push_back(ConstantInt::get(Type::getInt32Ty(C), 0));
+        }
+      } else {
+        report_fatal_error("Coroutines cannot handle non static allocas yet");
+      }
+    }
+
+    return Builder.CreateInBoundsGEP(FrameTy, FramePtr, Indices);
+  };
+
   // Create a load instruction to reload the spilled value from the coroutine
   // frame.
   auto CreateReload = [&](Instruction *InsertBefore) {
     assert(Index && "accessing unassigned field number");
     Builder.SetInsertPoint(InsertBefore);
-    auto *G = Builder.CreateConstInBoundsGEP2_32(FrameTy, FramePtr, 0, Index,
-                                                 CurrentValue->getName() +
-                                                     Twine(".reload.addr"));
+
+    auto *G = GetFramePointer(Index, CurrentValue);
+    G->setName(CurrentValue->getName() + Twine(".reload.addr"));
+
     return isa<AllocaInst>(CurrentValue)
                ? G
-               : Builder.CreateLoad(G,
+               : Builder.CreateLoad(FrameTy->getElementType(Index), G,
                                     CurrentValue->getName() + Twine(".reload"));
   };
 
@@ -546,7 +578,8 @@ static Instruction *insertSpills(SpillInfo &Spills, coro::Shape &Shape) {
         } else {
           // For all other values, the spill is placed immediately after
           // the definition.
-          assert(!isa<TerminatorInst>(E.def()) && "unexpected terminator");
+          assert(!cast<Instruction>(E.def())->isTerminator() &&
+                 "unexpected terminator");
           InsertPt = cast<Instruction>(E.def())->getNextNode();
         }
 
@@ -588,8 +621,8 @@ static Instruction *insertSpills(SpillInfo &Spills, coro::Shape &Shape) {
   Builder.SetInsertPoint(&Shape.AllocaSpillBlock->front());
   // If we found any allocas, replace all of their remaining uses with Geps.
   for (auto &P : Allocas) {
-    auto *G =
-        Builder.CreateConstInBoundsGEP2_32(FrameTy, FramePtr, 0, P.second);
+    auto *G = GetFramePointer(P.second, P.first);
+
     // We are not using ReplaceInstWithInst(P.first, cast<Instruction>(G)) here,
     // as we are changing location of the instruction.
     G->takeName(P.first);
@@ -600,7 +633,7 @@ static Instruction *insertSpills(SpillInfo &Spills, coro::Shape &Shape) {
 }
 
 // Sets the unwind edge of an instruction to a particular successor.
-static void setUnwindEdgeTo(TerminatorInst *TI, BasicBlock *Succ) {
+static void setUnwindEdgeTo(Instruction *TI, BasicBlock *Succ) {
   if (auto *II = dyn_cast<InvokeInst>(TI))
     II->setUnwindDest(Succ);
   else if (auto *CS = dyn_cast<CatchSwitchInst>(TI))
@@ -821,7 +854,7 @@ static void moveSpillUsesAfterCoroBegin(Function &F, SpillInfo const &Spills,
     for (User *U : CurrentValue->users()) {
       Instruction *I = cast<Instruction>(U);
       if (!DT.dominates(CoroBegin, I)) {
-        DEBUG(dbgs() << "will move: " << *I << "\n");
+        LLVM_DEBUG(dbgs() << "will move: " << *I << "\n");
 
         // TODO: Make this more robust. Currently if we run into a situation
         // where simple instruction move won't work we panic and
@@ -906,7 +939,7 @@ void coro::buildCoroutineFrame(Function &F, Shape &Shape) {
       break;
 
     // Rewrite materializable instructions to be materialized at the use point.
-    DEBUG(dump("Materializations", Spills));
+    LLVM_DEBUG(dump("Materializations", Spills));
     rewriteMaterializableInstructions(Builder, Spills);
     Spills.clear();
   }
@@ -936,7 +969,7 @@ void coro::buildCoroutineFrame(Function &F, Shape &Shape) {
         Spills.emplace_back(&I, U);
       }
   }
-  DEBUG(dump("Spills", Spills));
+  LLVM_DEBUG(dump("Spills", Spills));
   moveSpillUsesAfterCoroBegin(F, Spills, Shape.CoroBegin);
   Shape.FrameTy = buildFrameType(F, Shape, Spills);
   Shape.FramePtr = insertSpills(Spills, Shape);

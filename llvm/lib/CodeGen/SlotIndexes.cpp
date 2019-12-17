@@ -1,9 +1,8 @@
 //===-- SlotIndexes.cpp - Slot Indexes Pass  ------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,7 +22,6 @@ INITIALIZE_PASS(SlotIndexes, DEBUG_TYPE,
                 "Slot index numbering", false, false)
 
 STATISTIC(NumLocalRenum,  "Number of local renumberings");
-STATISTIC(NumGlobalRenum, "Number of global renumberings");
 
 void SlotIndexes::getAnalysisUsage(AnalysisUsage &au) const {
   au.setPreservesAll();
@@ -95,9 +93,9 @@ bool SlotIndexes::runOnMachineFunction(MachineFunction &fn) {
   }
 
   // Sort the Idx2MBBMap
-  llvm::sort(idx2MBBMap.begin(), idx2MBBMap.end(), Idx2MBBCompare());
+  llvm::sort(idx2MBBMap, less_first());
 
-  DEBUG(mf->print(dbgs(), this));
+  LLVM_DEBUG(mf->print(dbgs(), this));
 
   // And we're done!
   return false;
@@ -145,20 +143,6 @@ void SlotIndexes::removeSingleMachineInstrFromMaps(MachineInstr &MI) {
   }
 }
 
-void SlotIndexes::renumberIndexes() {
-  // Renumber updates the index of every element of the index list.
-  DEBUG(dbgs() << "\n*** Renumbering SlotIndexes ***\n");
-  ++NumGlobalRenum;
-
-  unsigned index = 0;
-
-  for (IndexList::iterator I = indexList.begin(), E = indexList.end();
-       I != E; ++I) {
-    I->setIndex(index);
-    index += SlotIndex::InstrDist;
-  }
-}
-
 // Renumber indexes locally after curItr was inserted, but failed to get a new
 // index.
 void SlotIndexes::renumberIndexes(IndexList::iterator curItr) {
@@ -174,8 +158,8 @@ void SlotIndexes::renumberIndexes(IndexList::iterator curItr) {
     // If the next index is bigger, we have caught up.
   } while (curItr != indexList.end() && curItr->getIndex() <= index);
 
-  DEBUG(dbgs() << "\n*** Renumbered SlotIndexes " << startItr->getIndex() << '-'
-               << index << " ***\n");
+  LLVM_DEBUG(dbgs() << "\n*** Renumbered SlotIndexes " << startItr->getIndex()
+                    << '-' << index << " ***\n");
   ++NumLocalRenum;
 }
 

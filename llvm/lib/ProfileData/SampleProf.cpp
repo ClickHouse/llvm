@@ -1,9 +1,8 @@
 //=-- SampleProf.cpp - Sample profiling format support --------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -25,6 +24,14 @@
 
 using namespace llvm;
 using namespace sampleprof;
+
+namespace llvm {
+namespace sampleprof {
+SampleProfileFormat FunctionSamples::Format;
+DenseMap<uint64_t, StringRef> FunctionSamples::GUIDToFuncNameMap;
+Module *FunctionSamples::CurrentModule;
+} // namespace sampleprof
+} // namespace llvm
 
 namespace {
 
@@ -59,6 +66,8 @@ class SampleProfErrorCategoryType : public std::error_category {
       return "Unimplemented feature";
     case sampleprof_error::counter_overflow:
       return "Counter overflow";
+    case sampleprof_error::ostream_seek_unsupported:
+      return "Ostream does not support seek";
     }
     llvm_unreachable("A value of sampleprof_error has no message.");
   }

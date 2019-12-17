@@ -1,9 +1,8 @@
 //===------ CFIInstrInserter.cpp - Insert additional CFI instructions -----===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -151,7 +150,6 @@ void CFIInstrInserter::calculateCFAInfo(MachineFunction &MF) {
   // information.
   for (MachineBasicBlock &MBB : MF) {
     if (MBBVector[MBB.getNumber()].Processed) continue;
-    calculateOutgoingCFAInfo(MBBVector[MBB.getNumber()]);
     updateSuccCFAInfo(MBBVector[MBB.getNumber()]);
   }
 }
@@ -208,6 +206,7 @@ void CFIInstrInserter::calculateOutgoingCFAInfo(MBBCFAInfo &MBBInfo) {
       case MCCFIInstruction::OpUndefined:
       case MCCFIInstruction::OpRegister:
       case MCCFIInstruction::OpWindowSave:
+      case MCCFIInstruction::OpNegateRAState:
       case MCCFIInstruction::OpGnuArgsSize:
         break;
       }
@@ -222,14 +221,25 @@ void CFIInstrInserter::calculateOutgoingCFAInfo(MBBCFAInfo &MBBInfo) {
 }
 
 void CFIInstrInserter::updateSuccCFAInfo(MBBCFAInfo &MBBInfo) {
-  for (MachineBasicBlock *Succ : MBBInfo.MBB->successors()) {
-    MBBCFAInfo &SuccInfo = MBBVector[Succ->getNumber()];
-    if (SuccInfo.Processed) continue;
-    SuccInfo.IncomingCFAOffset = MBBInfo.OutgoingCFAOffset;
-    SuccInfo.IncomingCFARegister = MBBInfo.OutgoingCFARegister;
-    calculateOutgoingCFAInfo(SuccInfo);
-    updateSuccCFAInfo(SuccInfo);
-  }
+  SmallVector<MachineBasicBlock *, 4> Stack;
+  Stack.push_back(MBBInfo.MBB);
+
+  do {
+    MachineBasicBlock *Current = Stack.pop_back_val();
+    MBBCFAInfo &CurrentInfo = MBBVector[Current->getNumber()];
+    if (CurrentInfo.Processed)
+      continue;
+
+    calculateOutgoingCFAInfo(CurrentInfo);
+    for (auto *Succ : CurrentInfo.MBB->successors()) {
+      MBBCFAInfo &SuccInfo = MBBVector[Succ->getNumber()];
+      if (!SuccInfo.Processed) {
+        SuccInfo.IncomingCFAOffset = CurrentInfo.OutgoingCFAOffset;
+        SuccInfo.IncomingCFARegister = CurrentInfo.OutgoingCFARegister;
+        Stack.push_back(Succ);
+      }
+    }
+  } while (!Stack.empty());
 }
 
 bool CFIInstrInserter::insertCFIInstrs(MachineFunction &MF) {
@@ -282,17 +292,18 @@ bool CFIInstrInserter::insertCFIInstrs(MachineFunction &MF) {
   return InsertedCFIInstr;
 }
 
-void CFIInstrInserter::report(const MBBCFAInfo &Pred,
-                              const MBBCFAInfo &Succ) {
+void CFIInstrInserter::report(const MBBCFAInfo &Pred, const MBBCFAInfo &Succ) {
   errs() << "*** Inconsistent CFA register and/or offset between pred and succ "
             "***\n";
-  errs() << "Pred: " << Pred.MBB->getName()
+  errs() << "Pred: " << Pred.MBB->getName() << " #" << Pred.MBB->getNumber()
+         << " in " << Pred.MBB->getParent()->getName()
          << " outgoing CFA Reg:" << Pred.OutgoingCFARegister << "\n";
-  errs() << "Pred: " << Pred.MBB->getName()
+  errs() << "Pred: " << Pred.MBB->getName() << " #" << Pred.MBB->getNumber()
+         << " in " << Pred.MBB->getParent()->getName()
          << " outgoing CFA Offset:" << Pred.OutgoingCFAOffset << "\n";
-  errs() << "Succ: " << Succ.MBB->getName()
+  errs() << "Succ: " << Succ.MBB->getName() << " #" << Succ.MBB->getNumber()
          << " incoming CFA Reg:" << Succ.IncomingCFARegister << "\n";
-  errs() << "Succ: " << Succ.MBB->getName()
+  errs() << "Succ: " << Succ.MBB->getName() << " #" << Succ.MBB->getNumber()
          << " incoming CFA Offset:" << Succ.IncomingCFAOffset << "\n";
 }
 
@@ -306,6 +317,10 @@ unsigned CFIInstrInserter::verify(MachineFunction &MF) {
       // outgoing offset and register values of CurrMBB
       if (SuccMBBInfo.IncomingCFAOffset != CurrMBBInfo.OutgoingCFAOffset ||
           SuccMBBInfo.IncomingCFARegister != CurrMBBInfo.OutgoingCFARegister) {
+        // Inconsistent offsets/registers are ok for 'noreturn' blocks because
+        // we don't generate epilogues inside such blocks.
+        if (SuccMBBInfo.MBB->succ_empty() && !SuccMBBInfo.MBB->isReturnBlock())
+          continue;
         report(CurrMBBInfo, SuccMBBInfo);
         ErrorNum++;
       }

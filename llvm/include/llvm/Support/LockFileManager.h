@@ -1,9 +1,8 @@
 //===--- LockFileManager.h - File-level locking utility ---------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 #ifndef LLVM_SUPPORT_LOCKFILEMANAGER_H
@@ -11,7 +10,6 @@
 
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/FileSystem.h"
 #include <system_error>
 #include <utility> // for std::pair
 
@@ -54,7 +52,7 @@ public:
 private:
   SmallString<128> FileName;
   SmallString<128> LockFileName;
-  Optional<sys::fs::TempFile> UniqueLockFile;
+  SmallString<128> UniqueLockFileName;
 
   Optional<std::pair<std::string, int> > Owner;
   std::error_code ErrorCode;

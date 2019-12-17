@@ -1,9 +1,8 @@
 //===- llvm/CallingConv.h - LLVM Calling Conventions ------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -219,6 +218,9 @@ namespace CallingConv {
     /// if geometry is in use. So either the domain (= tessellation evaluation)
     /// shader if tessellation is in use, or otherwise the vertex shader.
     AMDGPU_ES = 96,
+
+    // Calling convention between AArch64 Advanced SIMD functions
+    AArch64_VectorCall = 97,
 
     /// The highest possible calling convention ID. Must be some 2^k - 1.
     MaxID = 1023

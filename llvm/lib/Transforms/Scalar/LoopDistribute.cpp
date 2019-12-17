@@ -1,9 +1,8 @@
 //===- LoopDistribute.cpp - Loop Distribution Pass ------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -77,6 +76,18 @@ using namespace llvm;
 
 #define LDIST_NAME "loop-distribute"
 #define DEBUG_TYPE LDIST_NAME
+
+/// @{
+/// Metadata attribute names
+static const char *const LLVMLoopDistributeFollowupAll =
+    "llvm.loop.distribute.followup_all";
+static const char *const LLVMLoopDistributeFollowupCoincident =
+    "llvm.loop.distribute.followup_coincident";
+static const char *const LLVMLoopDistributeFollowupSequential =
+    "llvm.loop.distribute.followup_sequential";
+static const char *const LLVMLoopDistributeFollowupFallback =
+    "llvm.loop.distribute.followup_fallback";
+/// @}
 
 static cl::opt<bool>
     LDistVerify("loop-distribute-verify", cl::Hidden,
@@ -186,7 +197,7 @@ public:
   /// Returns the loop where this partition ends up after distribution.
   /// If this partition is mapped to the original loop then use the block from
   /// the loop.
-  const Loop *getDistributedLoop() const {
+  Loop *getDistributedLoop() const {
     return ClonedLoop ? ClonedLoop : OrigLoop;
   }
 
@@ -362,9 +373,11 @@ public:
           std::tie(LoadToPart, NewElt) =
               LoadToPartition.insert(std::make_pair(Inst, PartI));
           if (!NewElt) {
-            DEBUG(dbgs() << "Merging partitions due to this load in multiple "
-                         << "partitions: " << PartI << ", "
-                         << LoadToPart->second << "\n" << *Inst << "\n");
+            LLVM_DEBUG(dbgs()
+                       << "Merging partitions due to this load in multiple "
+                       << "partitions: " << PartI << ", " << LoadToPart->second
+                       << "\n"
+                       << *Inst << "\n");
 
             auto PartJ = I;
             do {
@@ -441,6 +454,9 @@ public:
     assert(&*OrigPH->begin() == OrigPH->getTerminator() &&
            "preheader not empty");
 
+    // Preserve the original loop ID for use after the transformation.
+    MDNode *OrigLoopID = L->getLoopID();
+
     // Create a loop for each partition except the last.  Clone the original
     // loop before PH along with adding a preheader for the cloned loop.  Then
     // update PH to point to the newly added preheader.
@@ -455,8 +471,12 @@ public:
 
       Part->getVMap()[ExitBlock] = TopPH;
       Part->remapInstructions();
+      setNewLoopID(OrigLoopID, Part);
     }
     Pred->getTerminator()->replaceUsesOfWith(OrigPH, TopPH);
+
+    // Also set a new loop ID for the last loop.
+    setNewLoopID(OrigLoopID, &PartitionContainer.back());
 
     // Now go in forward order and update the immediate dominator for the
     // preheaders with the exiting block of the previous loop.  Dominance
@@ -573,6 +593,19 @@ private:
       }
     }
   }
+
+  /// Assign new LoopIDs for the partition's cloned loop.
+  void setNewLoopID(MDNode *OrigLoopID, InstPartition *Part) {
+    Optional<MDNode *> PartitionID = makeFollowupLoopID(
+        OrigLoopID,
+        {LLVMLoopDistributeFollowupAll,
+         Part->hasDepCycle() ? LLVMLoopDistributeFollowupSequential
+                             : LLVMLoopDistributeFollowupCoincident});
+    if (PartitionID.hasValue()) {
+      Loop *NewLoop = Part->getDistributedLoop();
+      NewLoop->setLoopID(PartitionID.getValue());
+    }
+  }
 };
 
 /// For each memory instruction, this class maintains difference of the
@@ -602,7 +635,7 @@ public:
       const SmallVectorImpl<Dependence> &Dependences) {
     Accesses.append(Instructions.begin(), Instructions.end());
 
-    DEBUG(dbgs() << "Backward dependences:\n");
+    LLVM_DEBUG(dbgs() << "Backward dependences:\n");
     for (auto &Dep : Dependences)
       if (Dep.isPossiblyBackward()) {
         // Note that the designations source and destination follow the program
@@ -611,7 +644,7 @@ public:
         ++Accesses[Dep.Source].NumUnsafeDependencesStartOrEnd;
         --Accesses[Dep.Destination].NumUnsafeDependencesStartOrEnd;
 
-        DEBUG(Dep.print(dbgs(), 2, Instructions));
+        LLVM_DEBUG(Dep.print(dbgs(), 2, Instructions));
       }
   }
 
@@ -632,8 +665,9 @@ public:
   bool processLoop(std::function<const LoopAccessInfo &(Loop &)> &GetLAA) {
     assert(L->empty() && "Only process inner loops.");
 
-    DEBUG(dbgs() << "\nLDist: In \"" << L->getHeader()->getParent()->getName()
-                 << "\" checking " << *L << "\n");
+    LLVM_DEBUG(dbgs() << "\nLDist: In \""
+                      << L->getHeader()->getParent()->getName()
+                      << "\" checking " << *L << "\n");
 
     if (!L->getExitBlock())
       return fail("MultipleExitBlocks", "multiple exit blocks");
@@ -705,7 +739,7 @@ public:
     for (auto *Inst : DefsUsedOutside)
       Partitions.addToNewNonCyclicPartition(Inst);
 
-    DEBUG(dbgs() << "Seeded partitions:\n" << Partitions);
+    LLVM_DEBUG(dbgs() << "Seeded partitions:\n" << Partitions);
     if (Partitions.getSize() < 2)
       return fail("CantIsolateUnsafeDeps",
                   "cannot isolate unsafe dependencies");
@@ -713,34 +747,43 @@ public:
     // Run the merge heuristics: Merge non-cyclic adjacent partitions since we
     // should be able to vectorize these together.
     Partitions.mergeBeforePopulating();
-    DEBUG(dbgs() << "\nMerged partitions:\n" << Partitions);
+    LLVM_DEBUG(dbgs() << "\nMerged partitions:\n" << Partitions);
     if (Partitions.getSize() < 2)
       return fail("CantIsolateUnsafeDeps",
                   "cannot isolate unsafe dependencies");
 
     // Now, populate the partitions with non-memory operations.
     Partitions.populateUsedSet();
-    DEBUG(dbgs() << "\nPopulated partitions:\n" << Partitions);
+    LLVM_DEBUG(dbgs() << "\nPopulated partitions:\n" << Partitions);
 
     // In order to preserve original lexical order for loads, keep them in the
     // partition that we set up in the MemoryInstructionDependences loop.
     if (Partitions.mergeToAvoidDuplicatedLoads()) {
-      DEBUG(dbgs() << "\nPartitions merged to ensure unique loads:\n"
-                   << Partitions);
+      LLVM_DEBUG(dbgs() << "\nPartitions merged to ensure unique loads:\n"
+                        << Partitions);
       if (Partitions.getSize() < 2)
         return fail("CantIsolateUnsafeDeps",
                     "cannot isolate unsafe dependencies");
     }
 
-    // Don't distribute the loop if we need too many SCEV run-time checks.
+    // Don't distribute the loop if we need too many SCEV run-time checks, or
+    // any if it's illegal.
     const SCEVUnionPredicate &Pred = LAI->getPSE().getUnionPredicate();
+    if (LAI->hasConvergentOp() && !Pred.isAlwaysTrue()) {
+      return fail("RuntimeCheckWithConvergent",
+                  "may not insert runtime check with convergent operation");
+    }
+
     if (Pred.getComplexity() > (IsForced.getValueOr(false)
                                     ? PragmaDistributeSCEVCheckThreshold
                                     : DistributeSCEVCheckThreshold))
       return fail("TooManySCEVRuntimeChecks",
                   "too many SCEV run-time checks needed.\n");
 
-    DEBUG(dbgs() << "\nDistributing loop: " << *L << "\n");
+    if (!IsForced.getValueOr(false) && hasDisableAllTransformsHint(L))
+      return fail("HeuristicDisabled", "distribution heuristic disabled");
+
+    LLVM_DEBUG(dbgs() << "\nDistributing loop: " << *L << "\n");
     // We're done forming the partitions set up the reverse mapping from
     // instructions to partitions.
     Partitions.setupPartitionIdOnInstructions();
@@ -758,14 +801,34 @@ public:
     auto Checks = includeOnlyCrossPartitionChecks(AllChecks, PtrToPartition,
                                                   RtPtrChecking);
 
+    if (LAI->hasConvergentOp() && !Checks.empty()) {
+      return fail("RuntimeCheckWithConvergent",
+                  "may not insert runtime check with convergent operation");
+    }
+
     if (!Pred.isAlwaysTrue() || !Checks.empty()) {
-      DEBUG(dbgs() << "\nPointers:\n");
-      DEBUG(LAI->getRuntimePointerChecking()->printChecks(dbgs(), Checks));
+      assert(!LAI->hasConvergentOp() && "inserting illegal loop versioning");
+
+      MDNode *OrigLoopID = L->getLoopID();
+
+      LLVM_DEBUG(dbgs() << "\nPointers:\n");
+      LLVM_DEBUG(LAI->getRuntimePointerChecking()->printChecks(dbgs(), Checks));
       LoopVersioning LVer(*LAI, L, LI, DT, SE, false);
       LVer.setAliasChecks(std::move(Checks));
       LVer.setSCEVChecks(LAI->getPSE().getUnionPredicate());
       LVer.versionLoop(DefsUsedOutside);
       LVer.annotateLoopWithNoAlias();
+
+      // The unversioned loop will not be changed, so we inherit all attributes
+      // from the original loop, but remove the loop distribution metadata to
+      // avoid to distribute it again.
+      MDNode *UnversionedLoopID =
+          makeFollowupLoopID(OrigLoopID,
+                             {LLVMLoopDistributeFollowupAll,
+                              LLVMLoopDistributeFollowupFallback},
+                             "llvm.loop.distribute.", true)
+              .getValue();
+      LVer.getNonVersionedLoop()->setLoopID(UnversionedLoopID);
     }
 
     // Create identical copies of the original loop for each partition and hook
@@ -775,8 +838,8 @@ public:
     // Now, we remove the instruction from each loop that don't belong to that
     // partition.
     Partitions.removeUnusedInsts();
-    DEBUG(dbgs() << "\nAfter removing unused Instrs:\n");
-    DEBUG(Partitions.printBlocks());
+    LLVM_DEBUG(dbgs() << "\nAfter removing unused Instrs:\n");
+    LLVM_DEBUG(Partitions.printBlocks());
 
     if (LDistVerify) {
       LI->verify(*DT);
@@ -798,7 +861,7 @@ public:
     LLVMContext &Ctx = F->getContext();
     bool Forced = isForced().getValueOr(false);
 
-    DEBUG(dbgs() << "Skipping; " << Message << "\n");
+    LLVM_DEBUG(dbgs() << "Skipping; " << Message << "\n");
 
     // With Rpass-missed report that distribution failed.
     ORE->emit([&]() {

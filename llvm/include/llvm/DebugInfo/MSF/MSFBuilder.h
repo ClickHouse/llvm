@@ -1,9 +1,8 @@
 //===- MSFBuilder.h - MSF Directory & Metadata Builder ----------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,6 +19,8 @@
 #include <vector>
 
 namespace llvm {
+class FileBufferByteStream;
+class WritableBinaryStream;
 namespace msf {
 
 class MSFBuilder {
@@ -109,7 +110,10 @@ public:
 
   /// Finalize the layout and build the headers and structures that describe the
   /// MSF layout and can be written directly to the MSF file.
-  Expected<MSFLayout> build();
+  Expected<MSFLayout> generateLayout();
+
+  /// Write the MSF layout to the underlying file.
+  Expected<FileBufferByteStream> commit(StringRef Path, MSFLayout &Layout);
 
   BumpPtrAllocator &getAllocator() { return Allocator; }
 

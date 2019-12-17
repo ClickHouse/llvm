@@ -1,9 +1,8 @@
 //===- StringMap.h - String Hash table map interface ------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -164,9 +163,7 @@ public:
 
     StringMapEntry *NewItem =
       static_cast<StringMapEntry*>(Allocator.Allocate(AllocSize,Alignment));
-
-    if (NewItem == nullptr)
-      report_bad_alloc_error("Allocation of StringMap entry failed.");
+    assert(NewItem && "Unhandled out-of-memory");
 
     // Construct the value.
     new (NewItem) StringMapEntry(KeyLength, std::forward<InitTy>(InitVals)...);
@@ -360,6 +357,11 @@ public:
   /// count - Return 1 if the element is in the map, 0 otherwise.
   size_type count(StringRef Key) const {
     return find(Key) == end() ? 0 : 1;
+  }
+
+  template <typename InputTy>
+  size_type count(const StringMapEntry<InputTy> &MapEntry) const {
+    return count(MapEntry.getKey());
   }
 
   /// insert - Insert the specified key/value pair into the map.  If the key

@@ -1,9 +1,8 @@
 //===- Coroutines.cpp -----------------------------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -12,13 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Coroutines.h"
+#include "llvm-c/Transforms/Coroutines.h"
 #include "CoroInstr.h"
 #include "CoroInternal.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/CallGraphSCCPass.h"
-#include "llvm/Analysis/Utils/Local.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
@@ -176,15 +176,15 @@ static void buildCGN(CallGraph &CG, CallGraphNode *Node) {
 
   // Look for calls by this function.
   for (Instruction &I : instructions(F))
-    if (CallSite CS = CallSite(cast<Value>(&I))) {
-      const Function *Callee = CS.getCalledFunction();
+    if (auto *Call = dyn_cast<CallBase>(&I)) {
+      const Function *Callee = Call->getCalledFunction();
       if (!Callee || !Intrinsic::isLeaf(Callee->getIntrinsicID()))
         // Indirect calls of intrinsics are not allowed so no need to check.
         // We can be more precise here by using TargetArg returned by
         // Intrinsic::isLeaf.
-        Node->addCalledFunction(CS, CG.getCallsExternalNode());
+        Node->addCalledFunction(Call, CG.getCallsExternalNode());
       else if (!Callee->isIntrinsic())
-        Node->addCalledFunction(CS, CG.getOrInsertFunction(Callee));
+        Node->addCalledFunction(Call, CG.getOrInsertFunction(Callee));
     }
 }
 
@@ -343,4 +343,20 @@ void coro::Shape::buildFrom(Function &F) {
   // Remove orphaned coro.saves.
   for (CoroSaveInst *CoroSave : UnusedCoroSaves)
     CoroSave->eraseFromParent();
+}
+
+void LLVMAddCoroEarlyPass(LLVMPassManagerRef PM) {
+  unwrap(PM)->add(createCoroEarlyPass());
+}
+
+void LLVMAddCoroSplitPass(LLVMPassManagerRef PM) {
+  unwrap(PM)->add(createCoroSplitPass());
+}
+
+void LLVMAddCoroElidePass(LLVMPassManagerRef PM) {
+  unwrap(PM)->add(createCoroElidePass());
+}
+
+void LLVMAddCoroCleanupPass(LLVMPassManagerRef PM) {
+  unwrap(PM)->add(createCoroCleanupPass());
 }

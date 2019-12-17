@@ -1,9 +1,8 @@
 //===- Unix/Process.cpp - Unix Process Implementation --------- -*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -33,10 +32,7 @@
 #if HAVE_SIGNAL_H
 #include <signal.h>
 #endif
-// DragonFlyBSD, and OpenBSD have deprecated <malloc.h> for
-// <stdlib.h> instead. Unix.h includes this for us already.
-#if defined(HAVE_MALLOC_H) && !defined(__DragonFly__) && \
-    !defined(__OpenBSD__) 
+#if defined(HAVE_MALLINFO)
 #include <malloc.h>
 #endif
 #if defined(HAVE_MALLCTL)
@@ -73,14 +69,17 @@ static std::pair<std::chrono::microseconds, std::chrono::microseconds> getRUsage
 
 // On Cygwin, getpagesize() returns 64k(AllocationGranularity) and
 // offset in mmap(3) should be aligned to the AllocationGranularity.
-unsigned Process::getPageSize() {
+Expected<unsigned> Process::getPageSize() {
 #if defined(HAVE_GETPAGESIZE)
   static const int page_size = ::getpagesize();
 #elif defined(HAVE_SYSCONF)
   static long page_size = ::sysconf(_SC_PAGE_SIZE);
 #else
-#warning Cannot get the page size on this machine
+#error Cannot get the page size on this machine
 #endif
+  if (page_size == -1)
+    return errorCodeToError(std::error_code(errno, std::generic_category()));
+
   return static_cast<unsigned>(page_size);
 }
 
@@ -199,7 +198,7 @@ std::error_code Process::FixupStandardFileDescriptors() {
   for (int StandardFD : StandardFDs) {
     struct stat st;
     errno = 0;
-    if (RetryAfterSignal(-1, fstat, StandardFD, &st) < 0) {
+    if (RetryAfterSignal(-1, ::fstat, StandardFD, &st) < 0) {
       assert(errno && "expected errno to be set if fstat failed!");
       // fstat should return EBADF if the file descriptor is closed.
       if (errno != EBADF)
@@ -211,7 +210,10 @@ std::error_code Process::FixupStandardFileDescriptors() {
     assert(errno == EBADF && "expected errno to have EBADF at this point!");
 
     if (NullFD < 0) {
-      if ((NullFD = RetryAfterSignal(-1, open, "/dev/null", O_RDWR)) < 0)
+      // Call ::open in a lambda to avoid overload resolution in
+      // RetryAfterSignal when open is overloaded, such as in Bionic.
+      auto Open = [&]() { return ::open("/dev/null", O_RDWR); };
+      if ((NullFD = RetryAfterSignal(-1, Open)) < 0)
         return std::error_code(errno, std::generic_category());
     }
 
@@ -289,7 +291,8 @@ static unsigned getColumns(int FileID) {
 
   unsigned Columns = 0;
 
-#if defined(HAVE_SYS_IOCTL_H) && defined(HAVE_TERMIOS_H)
+#if defined(HAVE_SYS_IOCTL_H) && defined(HAVE_TERMIOS_H) \
+  && !(defined(_XOPEN_SOURCE) || defined(_POSIX_C_SOURCE))
   // Try to determine the width of the terminal.
   struct winsize ws;
   if (ioctl(FileID, TIOCGWINSZ, &ws) == 0)

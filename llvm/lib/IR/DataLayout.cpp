@@ -1,9 +1,8 @@
 //===- DataLayout.cpp - Data size & alignment routines ---------------------==//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -185,6 +184,8 @@ void DataLayout::reset(StringRef Desc) {
   AllocaAddrSpace = 0;
   StackNaturalAlign = 0;
   ProgramAddrSpace = 0;
+  FunctionPtrAlign = 0;
+  TheFunctionPtrAlignType = FunctionPtrAlignType::Independent;
   ManglingMode = MM_None;
   NonIntegralAddressSpaces.clear();
 
@@ -380,6 +381,22 @@ void DataLayout::parseSpecifier(StringRef Desc) {
       StackNaturalAlign = inBytes(getInt(Tok));
       break;
     }
+    case 'F': {
+      switch (Tok.front()) {
+      case 'i':
+        TheFunctionPtrAlignType = FunctionPtrAlignType::Independent;
+        break;
+      case 'n':
+        TheFunctionPtrAlignType = FunctionPtrAlignType::MultipleOfFunctionAlign;
+        break;
+      default:
+        report_fatal_error("Unknown function pointer alignment type in "
+                           "datalayout string");
+      }
+      Tok = Tok.substr(1);
+      FunctionPtrAlign = inBytes(getInt(Tok));
+      break;
+    }
     case 'P': { // Function address space.
       ProgramAddrSpace = getAddrSpace(Tok);
       break;
@@ -433,6 +450,8 @@ bool DataLayout::operator==(const DataLayout &Other) const {
              AllocaAddrSpace == Other.AllocaAddrSpace &&
              StackNaturalAlign == Other.StackNaturalAlign &&
              ProgramAddrSpace == Other.ProgramAddrSpace &&
+             FunctionPtrAlign == Other.FunctionPtrAlign &&
+             TheFunctionPtrAlignType == Other.TheFunctionPtrAlignType &&
              ManglingMode == Other.ManglingMode &&
              LegalIntWidths == Other.LegalIntWidths &&
              Alignments == Other.Alignments && Pointers == Other.Pointers;
@@ -444,12 +463,9 @@ DataLayout::AlignmentsTy::iterator
 DataLayout::findAlignmentLowerBound(AlignTypeEnum AlignType,
                                     uint32_t BitWidth) {
   auto Pair = std::make_pair((unsigned)AlignType, BitWidth);
-  return std::lower_bound(Alignments.begin(), Alignments.end(), Pair,
-                          [](const LayoutAlignElem &LHS,
-                             const std::pair<unsigned, uint32_t> &RHS) {
-                            return std::tie(LHS.AlignType, LHS.TypeBitWidth) <
-                                   std::tie(RHS.first, RHS.second);
-                          });
+  return partition_point(Alignments, [=](const LayoutAlignElem &E) {
+    return std::make_pair(E.AlignType, E.TypeBitWidth) < Pair;
+  });
 }
 
 void
@@ -596,10 +612,8 @@ const StructLayout *DataLayout::getStructLayout(StructType *Ty) const {
   // Otherwise, create the struct layout.  Because it is variable length, we
   // malloc it, then use placement new.
   int NumElts = Ty->getNumElements();
-  StructLayout *L =
-    (StructLayout *)malloc(sizeof(StructLayout)+(NumElts-1) * sizeof(uint64_t));
-  if (L == nullptr)
-    report_bad_alloc_error("Allocation of StructLayout elements failed.");
+  StructLayout *L = (StructLayout *)
+      safe_malloc(sizeof(StructLayout)+(NumElts-1) * sizeof(uint64_t));
 
   // Set SL before calling StructLayout's ctor.  The ctor could cause other
   // entries to be added to TheMap, invalidating our reference.
@@ -635,6 +649,14 @@ unsigned DataLayout::getPointerSize(unsigned AS) const {
     assert(I->AddressSpace == 0);
   }
   return I->TypeByteWidth;
+}
+
+unsigned DataLayout::getMaxPointerSize() const {
+  unsigned MaxPointerSize = 0;
+  for (auto &P : Pointers)
+    MaxPointerSize = std::max(MaxPointerSize, P.TypeByteWidth);
+
+  return MaxPointerSize;
 }
 
 unsigned DataLayout::getPointerTypeSizeInBits(Type *Ty) const {
@@ -810,15 +832,29 @@ int64_t DataLayout::getIndexedOffsetInType(Type *ElemTy,
 /// global.  This includes an explicitly requested alignment (if the global
 /// has one).
 unsigned DataLayout::getPreferredAlignment(const GlobalVariable *GV) const {
+  unsigned GVAlignment = GV->getAlignment();
+  // If a section is specified, always precisely honor explicit alignment,
+  // so we don't insert padding into a section we don't control.
+  if (GVAlignment && GV->hasSection())
+    return GVAlignment;
+
+  // If no explicit alignment is specified, compute the alignment based on
+  // the IR type. If an alignment is specified, increase it to match the ABI
+  // alignment of the IR type.
+  //
+  // FIXME: Not sure it makes sense to use the alignment of the type if
+  // there's already an explicit alignment specification.
   Type *ElemType = GV->getValueType();
   unsigned Alignment = getPrefTypeAlignment(ElemType);
-  unsigned GVAlignment = GV->getAlignment();
   if (GVAlignment >= Alignment) {
     Alignment = GVAlignment;
   } else if (GVAlignment != 0) {
     Alignment = std::max(GVAlignment, getABITypeAlignment(ElemType));
   }
 
+  // If no explicit alignment is specified, and the global is large, increase
+  // the alignment to 16.
+  // FIXME: Why 16, specifically?
   if (GV->hasInitializer() && GVAlignment == 0) {
     if (Alignment < 16) {
       // If the global is not external, see if it is large.  If so, give it a

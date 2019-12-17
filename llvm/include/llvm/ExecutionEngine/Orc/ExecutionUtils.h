@@ -1,9 +1,8 @@
 //===- ExecutionUtils.h - Utilities for executing code in Orc ---*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,6 +19,7 @@
 #include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/OrcError.h"
 #include "llvm/ExecutionEngine/RuntimeDyld.h"
+#include "llvm/Support/DynamicLibrary.h"
 #include <algorithm>
 #include <cstdint>
 #include <string>
@@ -32,6 +32,7 @@ class ConstantArray;
 class GlobalVariable;
 class Function;
 class Module;
+class TargetMachine;
 class Value;
 
 namespace orc {
@@ -92,11 +93,18 @@ iterator_range<CtorDtorIterator> getDestructors(const Module &M);
 /// Convenience class for recording constructor/destructor names for
 ///        later execution.
 template <typename JITLayerT>
-class CtorDtorRunner {
+class LegacyCtorDtorRunner {
 public:
   /// Construct a CtorDtorRunner for the given range using the given
   ///        name mangling function.
-  CtorDtorRunner(std::vector<std::string> CtorDtorNames, VModuleKey K)
+  LLVM_ATTRIBUTE_DEPRECATED(
+      LegacyCtorDtorRunner(std::vector<std::string> CtorDtorNames,
+                           VModuleKey K),
+      "ORCv1 utilities (utilities with the 'Legacy' prefix) are deprecated. "
+      "Please use the ORCv2 CtorDtorRunner utility instead");
+
+  LegacyCtorDtorRunner(ORCv1DeprecationAcknowledgement,
+                       std::vector<std::string> CtorDtorNames, VModuleKey K)
       : CtorDtorNames(std::move(CtorDtorNames)), K(K) {}
 
   /// Run the recorded constructors/destructors through the given JIT
@@ -127,6 +135,25 @@ private:
   orc::VModuleKey K;
 };
 
+template <typename JITLayerT>
+LegacyCtorDtorRunner<JITLayerT>::LegacyCtorDtorRunner(
+    std::vector<std::string> CtorDtorNames, VModuleKey K)
+    : CtorDtorNames(std::move(CtorDtorNames)), K(K) {}
+
+class CtorDtorRunner {
+public:
+  CtorDtorRunner(JITDylib &JD) : JD(JD) {}
+  void add(iterator_range<CtorDtorIterator> CtorDtors);
+  Error run();
+
+private:
+  using CtorDtorList = std::vector<SymbolStringPtr>;
+  using CtorDtorPriorityMap = std::map<unsigned, CtorDtorList>;
+
+  JITDylib &JD;
+  CtorDtorPriorityMap CtorDtorsByPriority;
+};
+
 /// Support class for static dtor execution. For hosted (in-process) JITs
 ///        only!
 ///
@@ -142,11 +169,37 @@ private:
 /// the client determines that destructors should be run (generally at JIT
 /// teardown or after a return from main), the runDestructors method should be
 /// called.
-class LocalCXXRuntimeOverrides {
+class LocalCXXRuntimeOverridesBase {
+public:
+  /// Run any destructors recorded by the overriden __cxa_atexit function
+  /// (CXAAtExitOverride).
+  void runDestructors();
+
+protected:
+  template <typename PtrTy> JITTargetAddress toTargetAddress(PtrTy *P) {
+    return static_cast<JITTargetAddress>(reinterpret_cast<uintptr_t>(P));
+  }
+
+  using DestructorPtr = void (*)(void *);
+  using CXXDestructorDataPair = std::pair<DestructorPtr, void *>;
+  using CXXDestructorDataPairList = std::vector<CXXDestructorDataPair>;
+  CXXDestructorDataPairList DSOHandleOverride;
+  static int CXAAtExitOverride(DestructorPtr Destructor, void *Arg,
+                               void *DSOHandle);
+};
+
+class LegacyLocalCXXRuntimeOverrides : public LocalCXXRuntimeOverridesBase {
 public:
   /// Create a runtime-overrides class.
   template <typename MangleFtorT>
-  LocalCXXRuntimeOverrides(const MangleFtorT &Mangle) {
+  LLVM_ATTRIBUTE_DEPRECATED(
+      LegacyLocalCXXRuntimeOverrides(const MangleFtorT &Mangle),
+      "ORCv1 utilities (utilities with the 'Legacy' prefix) are deprecated. "
+      "Please use the ORCv2 LocalCXXRuntimeOverrides utility instead");
+
+  template <typename MangleFtorT>
+  LegacyLocalCXXRuntimeOverrides(ORCv1DeprecationAcknowledgement,
+                                 const MangleFtorT &Mangle) {
     addOverride(Mangle("__dso_handle"), toTargetAddress(&DSOHandleOverride));
     addOverride(Mangle("__cxa_atexit"), toTargetAddress(&CXAAtExitOverride));
   }
@@ -159,32 +212,68 @@ public:
     return nullptr;
   }
 
-  /// Run any destructors recorded by the overriden __cxa_atexit function
-  /// (CXAAtExitOverride).
-  void runDestructors();
-
 private:
-  template <typename PtrTy>
-  JITTargetAddress toTargetAddress(PtrTy* P) {
-    return static_cast<JITTargetAddress>(reinterpret_cast<uintptr_t>(P));
-  }
-
   void addOverride(const std::string &Name, JITTargetAddress Addr) {
     CXXRuntimeOverrides.insert(std::make_pair(Name, Addr));
   }
 
   StringMap<JITTargetAddress> CXXRuntimeOverrides;
+};
 
-  using DestructorPtr = void (*)(void *);
-  using CXXDestructorDataPair = std::pair<DestructorPtr, void *>;
-  using CXXDestructorDataPairList = std::vector<CXXDestructorDataPair>;
-  CXXDestructorDataPairList DSOHandleOverride;
-  static int CXAAtExitOverride(DestructorPtr Destructor, void *Arg,
-                               void *DSOHandle);
+template <typename MangleFtorT>
+LegacyLocalCXXRuntimeOverrides::LegacyLocalCXXRuntimeOverrides(
+    const MangleFtorT &Mangle) {
+  addOverride(Mangle("__dso_handle"), toTargetAddress(&DSOHandleOverride));
+  addOverride(Mangle("__cxa_atexit"), toTargetAddress(&CXAAtExitOverride));
+}
+
+class LocalCXXRuntimeOverrides : public LocalCXXRuntimeOverridesBase {
+public:
+  Error enable(JITDylib &JD, MangleAndInterner &Mangler);
+};
+
+/// A utility class to expose symbols found via dlsym to the JIT.
+///
+/// If an instance of this class is attached to a JITDylib as a fallback
+/// definition generator, then any symbol found in the given DynamicLibrary that
+/// passes the 'Allow' predicate will be added to the JITDylib.
+class DynamicLibrarySearchGenerator {
+public:
+  using SymbolPredicate = std::function<bool(SymbolStringPtr)>;
+
+  /// Create a DynamicLibrarySearchGenerator that searches for symbols in the
+  /// given sys::DynamicLibrary.
+  ///
+  /// If the Allow predicate is given then only symbols matching the predicate
+  /// will be searched for. If the predicate is not given then all symbols will
+  /// be searched for.
+  DynamicLibrarySearchGenerator(sys::DynamicLibrary Dylib, char GlobalPrefix,
+                                SymbolPredicate Allow = SymbolPredicate());
+
+  /// Permanently loads the library at the given path and, on success, returns
+  /// a DynamicLibrarySearchGenerator that will search it for symbol definitions
+  /// in the library. On failure returns the reason the library failed to load.
+  static Expected<DynamicLibrarySearchGenerator>
+  Load(const char *FileName, char GlobalPrefix,
+       SymbolPredicate Allow = SymbolPredicate());
+
+  /// Creates a DynamicLibrarySearchGenerator that searches for symbols in
+  /// the current process.
+  static Expected<DynamicLibrarySearchGenerator>
+  GetForCurrentProcess(char GlobalPrefix,
+                       SymbolPredicate Allow = SymbolPredicate()) {
+    return Load(nullptr, GlobalPrefix, std::move(Allow));
+  }
+
+  Expected<SymbolNameSet> operator()(JITDylib &JD, const SymbolNameSet &Names);
+
+private:
+  sys::DynamicLibrary Dylib;
+  SymbolPredicate Allow;
+  char GlobalPrefix;
 };
 
 } // end namespace orc
-
 } // end namespace llvm
 
 #endif // LLVM_EXECUTIONENGINE_ORC_EXECUTIONUTILS_H

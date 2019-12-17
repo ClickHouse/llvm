@@ -1,9 +1,8 @@
 //===-LTOBackend.cpp - LLVM Link Time Optimizer Backend -------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -23,6 +22,7 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/IR/RemarkStreamer.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/LTO/LTO.h"
 #include "llvm/MC/SubtargetFeature.h"
@@ -33,9 +33,9 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/ThreadPool.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -138,22 +138,38 @@ createTargetMachine(Config &Conf, const Target *TheTarget, Module &M) {
     RelocModel =
         M.getPICLevel() == PICLevel::NotPIC ? Reloc::Static : Reloc::PIC_;
 
+  Optional<CodeModel::Model> CodeModel;
+  if (Conf.CodeModel)
+    CodeModel = *Conf.CodeModel;
+  else
+    CodeModel = M.getCodeModel();
+
   return std::unique_ptr<TargetMachine>(TheTarget->createTargetMachine(
       TheTriple, Conf.CPU, Features.getString(), Conf.Options, RelocModel,
-      Conf.CodeModel, Conf.CGOptLevel));
+      CodeModel, Conf.CGOptLevel));
 }
 
 static void runNewPMPasses(Config &Conf, Module &Mod, TargetMachine *TM,
-                           unsigned OptLevel, bool IsThinLTO) {
+                           unsigned OptLevel, bool IsThinLTO,
+                           ModuleSummaryIndex *ExportSummary,
+                           const ModuleSummaryIndex *ImportSummary) {
   Optional<PGOOptions> PGOOpt;
   if (!Conf.SampleProfile.empty())
-    PGOOpt = PGOOptions("", "", Conf.SampleProfile, false, true);
+    PGOOpt = PGOOptions(Conf.SampleProfile, "", Conf.ProfileRemapping,
+                        PGOOptions::SampleUse, PGOOptions::NoCSAction, true);
+  else if (Conf.RunCSIRInstr) {
+    PGOOpt = PGOOptions("", Conf.CSIRProfile, Conf.ProfileRemapping,
+                        PGOOptions::IRUse, PGOOptions::CSIRInstr);
+  } else if (!Conf.CSIRProfile.empty()) {
+    PGOOpt = PGOOptions(Conf.CSIRProfile, "", Conf.ProfileRemapping,
+                        PGOOptions::IRUse, PGOOptions::CSIRUse);
+  }
 
-  PassBuilder PB(TM, PGOOpt);
+  PassBuilder PB(TM, PipelineTuningOptions(), PGOOpt);
   AAManager AA;
 
   // Parse a custom AA pipeline if asked to.
-  if (!PB.parseAAPipeline(AA, "default"))
+  if (auto Err = PB.parseAAPipeline(AA, "default"))
     report_fatal_error("Error parsing default AA pipeline");
 
   LoopAnalysisManager LAM(Conf.DebugPassManager);
@@ -194,9 +210,10 @@ static void runNewPMPasses(Config &Conf, Module &Mod, TargetMachine *TM,
   }
 
   if (IsThinLTO)
-    MPM = PB.buildThinLTODefaultPipeline(OL, Conf.DebugPassManager);
+    MPM = PB.buildThinLTODefaultPipeline(OL, Conf.DebugPassManager,
+                                         ImportSummary);
   else
-    MPM = PB.buildLTODefaultPipeline(OL, Conf.DebugPassManager);
+    MPM = PB.buildLTODefaultPipeline(OL, Conf.DebugPassManager, ExportSummary);
   MPM.run(Mod, MAM);
 
   // FIXME (davide): verify the output.
@@ -211,9 +228,9 @@ static void runNewPMCustomPasses(Module &Mod, TargetMachine *TM,
 
   // Parse a custom AA pipeline if asked to.
   if (!AAPipelineDesc.empty())
-    if (!PB.parseAAPipeline(AA, AAPipelineDesc))
-      report_fatal_error("unable to parse AA pipeline description: " +
-                         AAPipelineDesc);
+    if (auto Err = PB.parseAAPipeline(AA, AAPipelineDesc))
+      report_fatal_error("unable to parse AA pipeline description '" +
+                         AAPipelineDesc + "': " + toString(std::move(Err)));
 
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
@@ -236,9 +253,9 @@ static void runNewPMCustomPasses(Module &Mod, TargetMachine *TM,
   MPM.addPass(VerifierPass());
 
   // Now, add all the passes we've been requested to.
-  if (!PB.parsePassPipeline(MPM, PipelineDesc))
-    report_fatal_error("unable to parse pass pipeline description: " +
-                       PipelineDesc);
+  if (auto Err = PB.parsePassPipeline(MPM, PipelineDesc))
+    report_fatal_error("unable to parse pass pipeline description '" +
+                       PipelineDesc + "': " + toString(std::move(Err)));
 
   if (!DisableVerify)
     MPM.addPass(VerifierPass());
@@ -264,6 +281,11 @@ static void runOldPMPasses(Config &Conf, Module &Mod, TargetMachine *TM,
   PMB.SLPVectorize = true;
   PMB.OptLevel = Conf.OptLevel;
   PMB.PGOSampleUse = Conf.SampleProfile;
+  PMB.EnablePGOCSInstrGen = Conf.RunCSIRInstr;
+  if (!Conf.RunCSIRInstr && !Conf.CSIRProfile.empty()) {
+    PMB.EnablePGOCSInstrUse = true;
+    PMB.PGOInstrUse = Conf.CSIRProfile;
+  }
   if (IsThinLTO)
     PMB.populateThinLTOPassManager(passes);
   else
@@ -279,68 +301,11 @@ bool opt(Config &Conf, TargetMachine *TM, unsigned Task, Module &Mod,
     runNewPMCustomPasses(Mod, TM, Conf.OptPipeline, Conf.AAPipeline,
                          Conf.DisableVerify);
   else if (Conf.UseNewPM)
-    runNewPMPasses(Conf, Mod, TM, Conf.OptLevel, IsThinLTO);
+    runNewPMPasses(Conf, Mod, TM, Conf.OptLevel, IsThinLTO, ExportSummary,
+                   ImportSummary);
   else
     runOldPMPasses(Conf, Mod, TM, IsThinLTO, ExportSummary, ImportSummary);
   return !Conf.PostOptModuleHook || Conf.PostOptModuleHook(Task, Mod);
-}
-
-void codegenWithSplitDwarf(Config &Conf, TargetMachine *TM,
-                           AddStreamFn AddStream, unsigned Task, Module &Mod) {
-  SmallString<128> TempFile;
-  int FD = -1;
-  if (auto EC =
-      sys::fs::createTemporaryFile("lto-llvm-fission", "o", FD, TempFile))
-    report_fatal_error("Could not create temporary file " +
-        TempFile.str() + ": " + EC.message());
-  llvm::raw_fd_ostream OS(FD, true);
-  SmallString<1024> DwarfFile(Conf.DwoDir);
-  std::string DwoName = sys::path::filename(Mod.getModuleIdentifier()).str() +
-      "-" + std::to_string(Task) + "-";
-  size_t index = TempFile.str().rfind("lto-llvm-fission");
-  StringRef TempID = TempFile.str().substr(index + 17, 6);
-  DwoName += TempID.str() + ".dwo";
-  sys::path::append(DwarfFile, DwoName);
-  TM->Options.MCOptions.SplitDwarfFile = DwarfFile.str().str();
-
-  legacy::PassManager CodeGenPasses;
-  if (TM->addPassesToEmitFile(CodeGenPasses, OS, Conf.CGFileType))
-    report_fatal_error("Failed to setup codegen");
-  CodeGenPasses.run(Mod);
-
-  if (auto EC = llvm::sys::fs::create_directories(Conf.DwoDir))
-    report_fatal_error("Failed to create directory " +
-		       Conf.DwoDir + ": " + EC.message());
-
-  SmallVector<const char*, 5> ExtractArgs, StripArgs;
-  ExtractArgs.push_back(Conf.Objcopy.c_str());
-  ExtractArgs.push_back("--extract-dwo");
-  ExtractArgs.push_back(TempFile.c_str());
-  ExtractArgs.push_back(TM->Options.MCOptions.SplitDwarfFile.c_str());
-  ExtractArgs.push_back(nullptr);
-  StripArgs.push_back(Conf.Objcopy.c_str());
-  StripArgs.push_back("--strip-dwo");
-  StripArgs.push_back(TempFile.c_str());
-  StripArgs.push_back(nullptr);
-
-  if (auto Ret = sys::ExecuteAndWait(Conf.Objcopy, ExtractArgs.data())) {
-    report_fatal_error("Failed to extract dwo from " + TempFile.str() +
-        ". Exit code " + std::to_string(Ret));
-  }
-  if (auto Ret = sys::ExecuteAndWait(Conf.Objcopy, StripArgs.data())) {
-    report_fatal_error("Failed to strip dwo from " + TempFile.str() +
-        ". Exit code " + std::to_string(Ret));
-  }
-
-  auto Stream = AddStream(Task);
-  auto Buffer = MemoryBuffer::getFile(TempFile);
-  if (auto EC = Buffer.getError())
-    report_fatal_error("Failed to load file " +
-                       TempFile.str() + ": " + EC.message());
-  *Stream->OS << Buffer.get()->getBuffer();
-  if (auto EC = sys::fs::remove(TempFile))
-    report_fatal_error("Failed to delete file " +
-                       TempFile.str() + ": " + EC.message());
 }
 
 void codegen(Config &Conf, TargetMachine *TM, AddStreamFn AddStream,
@@ -348,16 +313,37 @@ void codegen(Config &Conf, TargetMachine *TM, AddStreamFn AddStream,
   if (Conf.PreCodeGenModuleHook && !Conf.PreCodeGenModuleHook(Task, Mod))
     return;
 
+  std::unique_ptr<ToolOutputFile> DwoOut;
+  SmallString<1024> DwoFile(Conf.SplitDwarfOutput);
   if (!Conf.DwoDir.empty()) {
-    codegenWithSplitDwarf(Conf, TM, AddStream, Task, Mod);
-    return;
+    std::error_code EC;
+    if (auto EC = llvm::sys::fs::create_directories(Conf.DwoDir))
+      report_fatal_error("Failed to create directory " + Conf.DwoDir + ": " +
+                         EC.message());
+
+    DwoFile = Conf.DwoDir;
+    sys::path::append(DwoFile, std::to_string(Task) + ".dwo");
+    TM->Options.MCOptions.SplitDwarfFile = DwoFile.str().str();
+  } else
+    TM->Options.MCOptions.SplitDwarfFile = Conf.SplitDwarfFile;
+
+  if (!DwoFile.empty()) {
+    std::error_code EC;
+    DwoOut = llvm::make_unique<ToolOutputFile>(DwoFile, EC, sys::fs::F_None);
+    if (EC)
+      report_fatal_error("Failed to open " + DwoFile + ": " + EC.message());
   }
 
   auto Stream = AddStream(Task);
   legacy::PassManager CodeGenPasses;
-  if (TM->addPassesToEmitFile(CodeGenPasses, *Stream->OS, Conf.CGFileType))
+  if (TM->addPassesToEmitFile(CodeGenPasses, *Stream->OS,
+                              DwoOut ? &DwoOut->os() : nullptr,
+                              Conf.CGFileType))
     report_fatal_error("Failed to setup codegen");
   CodeGenPasses.run(Mod);
+
+  if (DwoOut)
+    DwoOut->keep();
 }
 
 void splitCodeGen(Config &C, TargetMachine *TM, AddStreamFn AddStream,
@@ -446,7 +432,8 @@ Error lto::backend(Config &C, AddStreamFn AddStream,
 
   // Setup optimization remarks.
   auto DiagFileOrErr = lto::setupOptimizationRemarks(
-      Mod->getContext(), C.RemarksFilename, C.RemarksWithHotness);
+      Mod->getContext(), C.RemarksFilename, C.RemarksPasses, C.RemarksFormat,
+      C.RemarksWithHotness);
   if (!DiagFileOrErr)
     return DiagFileOrErr.takeError();
   auto DiagnosticOutputFile = std::move(*DiagFileOrErr);
@@ -500,7 +487,8 @@ Error lto::thinBackend(Config &Conf, unsigned Task, AddStreamFn AddStream,
 
   // Setup optimization remarks.
   auto DiagFileOrErr = lto::setupOptimizationRemarks(
-      Mod.getContext(), Conf.RemarksFilename, Conf.RemarksWithHotness, Task);
+      Mod.getContext(), Conf.RemarksFilename, Conf.RemarksPasses,
+      Conf.RemarksFormat, Conf.RemarksWithHotness, Task);
   if (!DiagFileOrErr)
     return DiagFileOrErr.takeError();
   auto DiagnosticOutputFile = std::move(*DiagFileOrErr);
@@ -517,7 +505,7 @@ Error lto::thinBackend(Config &Conf, unsigned Task, AddStreamFn AddStream,
 
   dropDeadSymbols(Mod, DefinedGlobals, CombinedIndex);
 
-  thinLTOResolveWeakForLinkerModule(Mod, DefinedGlobals);
+  thinLTOResolvePrevailingInModule(Mod, DefinedGlobals);
 
   if (Conf.PostPromoteModuleHook && !Conf.PostPromoteModuleHook(Task, Mod))
     return finalizeOptimizationRemarks(std::move(DiagnosticOutputFile));

@@ -1,9 +1,8 @@
 //===- COFF.h - COFF object file implementation -----------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -276,6 +275,7 @@ struct coff_symbol_generic {
 };
 
 struct coff_aux_section_definition;
+struct coff_aux_weak_external;
 
 class COFFSymbolRef {
 public:
@@ -358,6 +358,13 @@ public:
         getStorageClass() != COFF::IMAGE_SYM_CLASS_STATIC)
       return nullptr;
     return getAux<coff_aux_section_definition>();
+  }
+
+  const coff_aux_weak_external *getWeakExternal() const {
+    if (!getNumberOfAuxSymbols() ||
+        getStorageClass() != COFF::IMAGE_SYM_CLASS_WEAK_EXTERNAL)
+      return nullptr;
+    return getAux<coff_aux_weak_external>();
   }
 
   bool isAbsolute() const {
@@ -585,6 +592,8 @@ enum class coff_guard_flags : uint32_t {
   HasLongJmpTable = 0x00010000,
   FidTableHasFlags = 0x10000000, // Indicates that fid tables are 5 bytes
 };
+
+enum class frame_type : uint16_t { Fpo = 0, Trap = 1, Tss = 2, NonFpo = 3 };
 
 struct coff_load_config_code_integrity {
   support::ulittle16_t Flags;
@@ -875,6 +884,7 @@ public:
     assert(is64());
     return reinterpret_cast<const coff_load_configuration64 *>(LoadConfig);
   }
+  StringRef getRelocationTypeName(uint16_t Type) const;
 
 protected:
   void moveSymbolNext(DataRefImpl &Symb) const override;
@@ -887,13 +897,12 @@ protected:
   Expected<SymbolRef::Type> getSymbolType(DataRefImpl Symb) const override;
   Expected<section_iterator> getSymbolSection(DataRefImpl Symb) const override;
   void moveSectionNext(DataRefImpl &Sec) const override;
-  std::error_code getSectionName(DataRefImpl Sec,
-                                 StringRef &Res) const override;
+  Expected<StringRef> getSectionName(DataRefImpl Sec) const override;
   uint64_t getSectionAddress(DataRefImpl Sec) const override;
   uint64_t getSectionIndex(DataRefImpl Sec) const override;
   uint64_t getSectionSize(DataRefImpl Sec) const override;
-  std::error_code getSectionContents(DataRefImpl Sec,
-                                     StringRef &Res) const override;
+  Expected<ArrayRef<uint8_t>>
+  getSectionContents(DataRefImpl Sec) const override;
   uint64_t getSectionAlignment(DataRefImpl Sec) const override;
   bool isSectionCompressed(DataRefImpl Sec) const override;
   bool isSectionText(DataRefImpl Sec) const override;
@@ -928,6 +937,7 @@ public:
   uint8_t getBytesInAddress() const override;
   StringRef getFileFormatName() const override;
   Triple::ArchType getArch() const override;
+  Expected<uint64_t> getStartAddress() const override;
   SubtargetFeatures getFeatures() const override { return SubtargetFeatures(); }
 
   import_directory_iterator import_directory_begin() const;
@@ -959,11 +969,16 @@ public:
       return nullptr;
     return reinterpret_cast<const dos_header *>(base());
   }
+  std::error_code getCOFFHeader(const coff_file_header *&Res) const;
+  std::error_code
+  getCOFFBigObjHeader(const coff_bigobj_file_header *&Res) const;
   std::error_code getPE32Header(const pe32_header *&Res) const;
   std::error_code getPE32PlusHeader(const pe32plus_header *&Res) const;
   std::error_code getDataDirectory(uint32_t index,
                                    const data_directory *&Res) const;
   std::error_code getSection(int32_t index, const coff_section *&Res) const;
+  std::error_code getSection(StringRef SectionName,
+                             const coff_section *&Res) const;
 
   template <typename coff_symbol_type>
   std::error_code getSymbol(uint32_t Index,
@@ -1005,6 +1020,8 @@ public:
 
   ArrayRef<uint8_t> getSymbolAuxData(COFFSymbolRef Symbol) const;
 
+  uint32_t getSymbolIndex(COFFSymbolRef Symbol) const;
+
   size_t getSymbolTableEntrySize() const {
     if (COFFHeader)
       return sizeof(coff_symbol16);
@@ -1015,10 +1032,10 @@ public:
 
   ArrayRef<coff_relocation> getRelocations(const coff_section *Sec) const;
 
-  std::error_code getSectionName(const coff_section *Sec, StringRef &Res) const;
+  Expected<StringRef> getSectionName(const coff_section *Sec) const;
   uint64_t getSectionSize(const coff_section *Sec) const;
-  std::error_code getSectionContents(const coff_section *Sec,
-                                     ArrayRef<uint8_t> &Res) const;
+  Error getSectionContents(const coff_section *Sec,
+                           ArrayRef<uint8_t> &Res) const;
 
   uint64_t getImageBase() const;
   std::error_code getVaPtr(uint64_t VA, uintptr_t &Res) const;
@@ -1047,6 +1064,8 @@ public:
 
   bool isRelocatableObject() const override;
   bool is64() const { return PE32PlusHeader; }
+
+  StringRef mapDebugSectionName(StringRef Name) const override;
 
   static bool classof(const Binary *v) { return v->isCOFF(); }
 };
@@ -1216,7 +1235,7 @@ struct FpoData {
   bool useBP() const { return (Attributes >> 10) & 1; }
 
   // cbFrame: frame pointer
-  int getFP() const { return Attributes >> 14; }
+  frame_type getFP() const { return static_cast<frame_type>(Attributes >> 14); }
 };
 
 } // end namespace object

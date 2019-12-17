@@ -1,9 +1,8 @@
 //===-- X86TargetObjectFile.h - X86 Object Info -----------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -69,19 +68,6 @@ namespace llvm {
   /// This implementation is used for Solaris on x86/x86-64.
   class X86SolarisTargetObjectFile : public X86ELFTargetObjectFile {
     void Initialize(MCContext &Ctx, const TargetMachine &TM) override;
-  };
-
-  /// This implementation is used for Windows targets on x86 and x86-64.
-  class X86WindowsTargetObjectFile : public TargetLoweringObjectFileCOFF {
-    const MCExpr *
-    lowerRelativeReference(const GlobalValue *LHS, const GlobalValue *RHS,
-                           const TargetMachine &TM) const override;
-
-    /// Given a mergeable constant with the specified size and relocation
-    /// information, return a section that it should be placed in.
-    MCSection *getSectionForConstant(const DataLayout &DL, SectionKind Kind,
-                                     const Constant *C,
-                                     unsigned &Align) const override;
   };
 
 } // end namespace llvm

@@ -1,9 +1,8 @@
 //===- Mutex.cpp - Mutual Exclusion Lock ------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -47,10 +46,7 @@ MutexImpl::MutexImpl( bool recursive)
 {
   // Declare the pthread_mutex data structures
   pthread_mutex_t* mutex =
-    static_cast<pthread_mutex_t*>(malloc(sizeof(pthread_mutex_t)));
-
-  if (mutex == nullptr)
-    report_bad_alloc_error("Mutex allocation failed");
+    static_cast<pthread_mutex_t*>(safe_malloc(sizeof(pthread_mutex_t)));
 
   pthread_mutexattr_t attr;
 

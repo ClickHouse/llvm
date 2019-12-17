@@ -1,9 +1,8 @@
 //===- MCExpr.h - Assembly Level Expressions --------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -135,21 +134,29 @@ inline raw_ostream &operator<<(raw_ostream &OS, const MCExpr &E) {
 ////  Represent a constant integer expression.
 class MCConstantExpr : public MCExpr {
   int64_t Value;
+  bool PrintInHex = false;
 
-  explicit MCConstantExpr(int64_t Value)
+  MCConstantExpr(int64_t Value)
       : MCExpr(MCExpr::Constant, SMLoc()), Value(Value) {}
+
+  MCConstantExpr(int64_t Value, bool PrintInHex)
+      : MCExpr(MCExpr::Constant, SMLoc()), Value(Value),
+        PrintInHex(PrintInHex) {}
 
 public:
   /// \name Construction
   /// @{
 
-  static const MCConstantExpr *create(int64_t Value, MCContext &Ctx);
+  static const MCConstantExpr *create(int64_t Value, MCContext &Ctx,
+                                      bool PrintInHex = false);
 
   /// @}
   /// \name Accessors
   /// @{
 
   int64_t getValue() const { return Value; }
+
+  bool useHexFormat() const { return PrintInHex; }
 
   /// @}
 
@@ -218,6 +225,8 @@ public:
     VK_PPC_LO,             // symbol@l
     VK_PPC_HI,             // symbol@h
     VK_PPC_HA,             // symbol@ha
+    VK_PPC_HIGH,           // symbol@high
+    VK_PPC_HIGHA,          // symbol@higha
     VK_PPC_HIGHER,         // symbol@higher
     VK_PPC_HIGHERA,        // symbol@highera
     VK_PPC_HIGHEST,        // symbol@highest
@@ -234,6 +243,8 @@ public:
     VK_PPC_TPREL_LO,       // symbol@tprel@l
     VK_PPC_TPREL_HI,       // symbol@tprel@h
     VK_PPC_TPREL_HA,       // symbol@tprel@ha
+    VK_PPC_TPREL_HIGH,     // symbol@tprel@high
+    VK_PPC_TPREL_HIGHA,    // symbol@tprel@higha
     VK_PPC_TPREL_HIGHER,   // symbol@tprel@higher
     VK_PPC_TPREL_HIGHERA,  // symbol@tprel@highera
     VK_PPC_TPREL_HIGHEST,  // symbol@tprel@highest
@@ -241,6 +252,8 @@ public:
     VK_PPC_DTPREL_LO,      // symbol@dtprel@l
     VK_PPC_DTPREL_HI,      // symbol@dtprel@h
     VK_PPC_DTPREL_HA,      // symbol@dtprel@ha
+    VK_PPC_DTPREL_HIGH,    // symbol@dtprel@high
+    VK_PPC_DTPREL_HIGHA,   // symbol@dtprel@higha
     VK_PPC_DTPREL_HIGHER,  // symbol@dtprel@higher
     VK_PPC_DTPREL_HIGHERA, // symbol@dtprel@highera
     VK_PPC_DTPREL_HIGHEST, // symbol@dtprel@highest
@@ -279,13 +292,17 @@ public:
     VK_Hexagon_IE,
     VK_Hexagon_IE_GOT,
 
-    VK_WebAssembly_FUNCTION, // Function table index, rather than virtual addr
-    VK_WebAssembly_TYPEINDEX,// Type table index
+    VK_WASM_TYPEINDEX, // Reference to a symbol's type (signature)
+    VK_WASM_MBREL,     // Memory address relative to memory base
+    VK_WASM_TBREL,     // Table index relative to table bare
 
     VK_AMDGPU_GOTPCREL32_LO, // symbol@gotpcrel32@lo
     VK_AMDGPU_GOTPCREL32_HI, // symbol@gotpcrel32@hi
     VK_AMDGPU_REL32_LO,      // symbol@rel32@lo
     VK_AMDGPU_REL32_HI,      // symbol@rel32@hi
+    VK_AMDGPU_REL64,         // symbol@rel64
+    VK_AMDGPU_ABS32_LO,      // symbol@abs32@lo
+    VK_AMDGPU_ABS32_HI,      // symbol@abs32@hi
 
     VK_TPREL,
     VK_DTPREL
@@ -581,6 +598,11 @@ public:
   virtual bool evaluateAsRelocatableImpl(MCValue &Res,
                                          const MCAsmLayout *Layout,
                                          const MCFixup *Fixup) const = 0;
+  // allow Target Expressions to be checked for equality
+  virtual bool isEqualTo(const MCExpr *x) const { return false; }
+  // This should be set when assigned expressions are not valid ".set"
+  // expressions, e.g. registers, and must be inlined.
+  virtual bool inlineAssignedExpr() const { return false; }
   virtual void visitUsedExpr(MCStreamer& Streamer) const = 0;
   virtual MCFragment *findAssociatedFragment() const = 0;
 

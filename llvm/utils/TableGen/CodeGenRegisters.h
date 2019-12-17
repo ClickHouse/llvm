@@ -1,9 +1,8 @@
 //===- CodeGenRegisters.h - Register and RegisterClass Info -----*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -348,7 +347,7 @@ namespace llvm {
     ArrayRef<ValueTypeByHwMode> getValueTypes() const { return VTs; }
     unsigned getNumValueTypes() const { return VTs.size(); }
 
-    ValueTypeByHwMode getValueTypeNum(unsigned VTNum) const {
+    const ValueTypeByHwMode &getValueTypeNum(unsigned VTNum) const {
       if (VTNum < VTs.size())
         return VTs[VTNum];
       llvm_unreachable("VTNum greater than number of ValueTypes in RegClass!");
@@ -561,6 +560,9 @@ namespace llvm {
 
     // Give each register unit set an order based on sorting criteria.
     std::vector<unsigned> RegUnitSetOrder;
+
+    // Keep track of synthesized definitions generated in TupleExpander.
+    std::vector<std::unique_ptr<Record>> SynthDefs;
 
     // Add RC to *2RC maps.
     void addToMaps(CodeGenRegisterClass*);

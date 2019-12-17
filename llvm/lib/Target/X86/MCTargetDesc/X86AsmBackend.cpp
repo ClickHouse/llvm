@@ -1,9 +1,8 @@
 //===-- X86AsmBackend.cpp - X86 Assembler Backend -------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -13,6 +12,7 @@
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/MC/MCAsmBackend.h"
+#include "llvm/MC/MCDwarf.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCFixupKindInfo.h"
@@ -26,18 +26,20 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
-static unsigned getFixupKindLog2Size(unsigned Kind) {
+static unsigned getFixupKindSize(unsigned Kind) {
   switch (Kind) {
   default:
     llvm_unreachable("invalid fixup kind!");
+  case FK_NONE:
+    return 0;
   case FK_PCRel_1:
   case FK_SecRel_1:
   case FK_Data_1:
-    return 0;
+    return 1;
   case FK_PCRel_2:
   case FK_SecRel_2:
   case FK_Data_2:
-    return 1;
+    return 2;
   case FK_PCRel_4:
   case X86::reloc_riprel_4byte:
   case X86::reloc_riprel_4byte_relax:
@@ -49,12 +51,12 @@ static unsigned getFixupKindLog2Size(unsigned Kind) {
   case X86::reloc_branch_4byte_pcrel:
   case FK_SecRel_4:
   case FK_Data_4:
-    return 2;
+    return 4;
   case FK_PCRel_8:
   case FK_SecRel_8:
   case FK_Data_8:
   case X86::reloc_global_offset_table8:
-    return 3;
+    return 8;
   }
 }
 
@@ -71,11 +73,13 @@ class X86AsmBackend : public MCAsmBackend {
   const MCSubtargetInfo &STI;
 public:
   X86AsmBackend(const Target &T, const MCSubtargetInfo &STI)
-      : MCAsmBackend(), STI(STI) {}
+      : MCAsmBackend(support::little), STI(STI) {}
 
   unsigned getNumFixupKinds() const override {
     return X86::NumTargetFixupKinds;
   }
+
+  Optional<MCFixupKind> getFixupKind(StringRef Name) const override;
 
   const MCFixupKindInfo &getFixupKindInfo(MCFixupKind Kind) const override {
     const static MCFixupKindInfo Infos[X86::NumTargetFixupKinds] = {
@@ -99,10 +103,14 @@ public:
     return Infos[Kind - FirstTargetFixupKind];
   }
 
+  bool shouldForceRelocation(const MCAssembler &Asm, const MCFixup &Fixup,
+                             const MCValue &Target) override;
+
   void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
                   const MCValue &Target, MutableArrayRef<char> Data,
-                  uint64_t Value, bool IsResolved) const override {
-    unsigned Size = 1 << getFixupKindLog2Size(Fixup.getKind());
+                  uint64_t Value, bool IsResolved,
+                  const MCSubtargetInfo *STI) const override {
+    unsigned Size = getFixupKindSize(Fixup.getKind());
 
     assert(Fixup.getOffset() + Size <= Data.size() && "Invalid fixup offset!");
 
@@ -110,14 +118,15 @@ public:
     // Specifically ignore overflow/underflow as long as the leakage is
     // limited to the lower bits. This is to remain compatible with
     // other assemblers.
-    assert(isIntN(Size * 8 + 1, Value) &&
+    assert((Size == 0 || isIntN(Size * 8 + 1, Value)) &&
            "Value does not fit in the Fixup field");
 
     for (unsigned i = 0; i != Size; ++i)
       Data[Fixup.getOffset() + i] = uint8_t(Value >> (i * 8));
   }
 
-  bool mayNeedRelaxation(const MCInst &Inst) const override;
+  bool mayNeedRelaxation(const MCInst &Inst,
+                         const MCSubtargetInfo &STI) const override;
 
   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
                             const MCRelaxableFragment *DF,
@@ -126,7 +135,7 @@ public:
   void relaxInstruction(const MCInst &Inst, const MCSubtargetInfo &STI,
                         MCInst &Res) const override;
 
-  bool writeNopData(uint64_t Count, MCObjectWriter *OW) const override;
+  bool writeNopData(raw_ostream &OS, uint64_t Count) const override;
 };
 } // end anonymous namespace
 
@@ -135,40 +144,10 @@ static unsigned getRelaxedOpcodeBranch(const MCInst &Inst, bool is16BitMode) {
   switch (Op) {
   default:
     return Op;
-  case X86::JAE_1:
-    return (is16BitMode) ? X86::JAE_2 : X86::JAE_4;
-  case X86::JA_1:
-    return (is16BitMode) ? X86::JA_2 : X86::JA_4;
-  case X86::JBE_1:
-    return (is16BitMode) ? X86::JBE_2 : X86::JBE_4;
-  case X86::JB_1:
-    return (is16BitMode) ? X86::JB_2 : X86::JB_4;
-  case X86::JE_1:
-    return (is16BitMode) ? X86::JE_2 : X86::JE_4;
-  case X86::JGE_1:
-    return (is16BitMode) ? X86::JGE_2 : X86::JGE_4;
-  case X86::JG_1:
-    return (is16BitMode) ? X86::JG_2 : X86::JG_4;
-  case X86::JLE_1:
-    return (is16BitMode) ? X86::JLE_2 : X86::JLE_4;
-  case X86::JL_1:
-    return (is16BitMode) ? X86::JL_2 : X86::JL_4;
+  case X86::JCC_1:
+    return (is16BitMode) ? X86::JCC_2 : X86::JCC_4;
   case X86::JMP_1:
     return (is16BitMode) ? X86::JMP_2 : X86::JMP_4;
-  case X86::JNE_1:
-    return (is16BitMode) ? X86::JNE_2 : X86::JNE_4;
-  case X86::JNO_1:
-    return (is16BitMode) ? X86::JNO_2 : X86::JNO_4;
-  case X86::JNP_1:
-    return (is16BitMode) ? X86::JNP_2 : X86::JNP_4;
-  case X86::JNS_1:
-    return (is16BitMode) ? X86::JNS_2 : X86::JNS_4;
-  case X86::JO_1:
-    return (is16BitMode) ? X86::JO_2 : X86::JO_4;
-  case X86::JP_1:
-    return (is16BitMode) ? X86::JP_2 : X86::JP_4;
-  case X86::JS_1:
-    return (is16BitMode) ? X86::JS_2 : X86::JS_4;
   }
 }
 
@@ -264,7 +243,27 @@ static unsigned getRelaxedOpcode(const MCInst &Inst, bool is16BitMode) {
   return getRelaxedOpcodeBranch(Inst, is16BitMode);
 }
 
-bool X86AsmBackend::mayNeedRelaxation(const MCInst &Inst) const {
+Optional<MCFixupKind> X86AsmBackend::getFixupKind(StringRef Name) const {
+  if (STI.getTargetTriple().isOSBinFormatELF()) {
+    if (STI.getTargetTriple().getArch() == Triple::x86_64) {
+      if (Name == "R_X86_64_NONE")
+        return FK_NONE;
+    } else {
+      if (Name == "R_386_NONE")
+        return FK_NONE;
+    }
+  }
+  return MCAsmBackend::getFixupKind(Name);
+}
+
+bool X86AsmBackend::shouldForceRelocation(const MCAssembler &,
+                                          const MCFixup &Fixup,
+                                          const MCValue &) {
+  return Fixup.getKind() == FK_NONE;
+}
+
+bool X86AsmBackend::mayNeedRelaxation(const MCInst &Inst,
+                                      const MCSubtargetInfo &STI) const {
   // Branches can always be relaxed in either mode.
   if (getRelaxedOpcodeBranch(Inst, false) != Inst.getOpcode())
     return true;
@@ -315,35 +314,35 @@ void X86AsmBackend::relaxInstruction(const MCInst &Inst,
 /// Write a sequence of optimal nops to the output, covering \p Count
 /// bytes.
 /// \return - true on success, false on failure
-bool X86AsmBackend::writeNopData(uint64_t Count, MCObjectWriter *OW) const {
-  static const uint8_t Nops[10][10] = {
+bool X86AsmBackend::writeNopData(raw_ostream &OS, uint64_t Count) const {
+  static const char Nops[10][11] = {
     // nop
-    {0x90},
+    "\x90",
     // xchg %ax,%ax
-    {0x66, 0x90},
+    "\x66\x90",
     // nopl (%[re]ax)
-    {0x0f, 0x1f, 0x00},
+    "\x0f\x1f\x00",
     // nopl 0(%[re]ax)
-    {0x0f, 0x1f, 0x40, 0x00},
+    "\x0f\x1f\x40\x00",
     // nopl 0(%[re]ax,%[re]ax,1)
-    {0x0f, 0x1f, 0x44, 0x00, 0x00},
+    "\x0f\x1f\x44\x00\x00",
     // nopw 0(%[re]ax,%[re]ax,1)
-    {0x66, 0x0f, 0x1f, 0x44, 0x00, 0x00},
+    "\x66\x0f\x1f\x44\x00\x00",
     // nopl 0L(%[re]ax)
-    {0x0f, 0x1f, 0x80, 0x00, 0x00, 0x00, 0x00},
+    "\x0f\x1f\x80\x00\x00\x00\x00",
     // nopl 0L(%[re]ax,%[re]ax,1)
-    {0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
+    "\x0f\x1f\x84\x00\x00\x00\x00\x00",
     // nopw 0L(%[re]ax,%[re]ax,1)
-    {0x66, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
+    "\x66\x0f\x1f\x84\x00\x00\x00\x00\x00",
     // nopw %cs:0L(%[re]ax,%[re]ax,1)
-    {0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
+    "\x66\x2e\x0f\x1f\x84\x00\x00\x00\x00\x00",
   };
 
   // This CPU doesn't support long nops. If needed add more.
   // FIXME: We could generated something better than plain 0x90.
   if (!STI.getFeatureBits()[X86::FeatureNOPL]) {
     for (uint64_t i = 0; i < Count; ++i)
-      OW->write8(0x90);
+      OS << '\x90';
     return true;
   }
 
@@ -363,10 +362,10 @@ bool X86AsmBackend::writeNopData(uint64_t Count, MCObjectWriter *OW) const {
     const uint8_t ThisNopLength = (uint8_t) std::min(Count, MaxNopLength);
     const uint8_t Prefixes = ThisNopLength <= 10 ? 0 : ThisNopLength - 10;
     for (uint8_t i = 0; i < Prefixes; i++)
-      OW->write8(0x66);
+      OS << '\x66';
     const uint8_t Rest = ThisNopLength - Prefixes;
-    for (uint8_t i = 0; i < Rest; i++)
-      OW->write8(Nops[Rest - 1][i]);
+    if (Rest != 0)
+      OS.write(Nops[Rest - 1], Rest);
     Count -= ThisNopLength;
   } while (Count != 0);
 
@@ -390,9 +389,9 @@ public:
                       const MCSubtargetInfo &STI)
     : ELFX86AsmBackend(T, OSABI, STI) {}
 
-  std::unique_ptr<MCObjectWriter>
-  createObjectWriter(raw_pwrite_stream &OS) const override {
-    return createX86ELFObjectWriter(OS, /*IsELF64*/ false, OSABI, ELF::EM_386);
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    return createX86ELFObjectWriter(/*IsELF64*/ false, OSABI, ELF::EM_386);
   }
 };
 
@@ -402,9 +401,9 @@ public:
                        const MCSubtargetInfo &STI)
       : ELFX86AsmBackend(T, OSABI, STI) {}
 
-  std::unique_ptr<MCObjectWriter>
-  createObjectWriter(raw_pwrite_stream &OS) const override {
-    return createX86ELFObjectWriter(OS, /*IsELF64*/ false, OSABI,
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    return createX86ELFObjectWriter(/*IsELF64*/ false, OSABI,
                                     ELF::EM_X86_64);
   }
 };
@@ -415,9 +414,9 @@ public:
                          const MCSubtargetInfo &STI)
       : ELFX86AsmBackend(T, OSABI, STI) {}
 
-  std::unique_ptr<MCObjectWriter>
-  createObjectWriter(raw_pwrite_stream &OS) const override {
-    return createX86ELFObjectWriter(OS, /*IsELF64*/ false, OSABI,
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    return createX86ELFObjectWriter(/*IsELF64*/ false, OSABI,
                                     ELF::EM_IAMCU);
   }
 };
@@ -428,9 +427,9 @@ public:
                       const MCSubtargetInfo &STI)
     : ELFX86AsmBackend(T, OSABI, STI) {}
 
-  std::unique_ptr<MCObjectWriter>
-  createObjectWriter(raw_pwrite_stream &OS) const override {
-    return createX86ELFObjectWriter(OS, /*IsELF64*/ true, OSABI, ELF::EM_X86_64);
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    return createX86ELFObjectWriter(/*IsELF64*/ true, OSABI, ELF::EM_X86_64);
   }
 };
 
@@ -452,9 +451,9 @@ public:
         .Default(MCAsmBackend::getFixupKind(Name));
   }
 
-  std::unique_ptr<MCObjectWriter>
-  createObjectWriter(raw_pwrite_stream &OS) const override {
-    return createX86WinCOFFObjectWriter(OS, Is64Bit);
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    return createX86WinCOFFObjectWriter(Is64Bit);
   }
 };
 
@@ -537,7 +536,6 @@ protected:
     unsigned InstrOffset = 0;
     unsigned StackAdjust = 0;
     unsigned StackSize = 0;
-    unsigned PrevStackSize = 0;
     unsigned NumDefCFAOffsets = 0;
 
     for (unsigned i = 0, e = Instrs.size(); i != e; ++i) {
@@ -585,7 +583,6 @@ protected:
         //  L0:
         //     .cfi_def_cfa_offset 80
         //
-        PrevStackSize = StackSize;
         StackSize = std::abs(Inst.getOffset()) / StackDivide;
         ++NumDefCFAOffsets;
         break;
@@ -632,16 +629,6 @@ protected:
       CompactUnwindEncoding |= (StackAdjust & 0xFF) << 16;
       CompactUnwindEncoding |= RegEnc & CU::UNWIND_BP_FRAME_REGISTERS;
     } else {
-      // If the amount of the stack allocation is the size of a register, then
-      // we "push" the RAX/EAX register onto the stack instead of adjusting the
-      // stack pointer with a SUB instruction. We don't support the push of the
-      // RAX/EAX register with compact unwind. So we check for that situation
-      // here.
-      if ((NumDefCFAOffsets == SavedRegIdx + 1 &&
-           StackSize - PrevStackSize == 1) ||
-          (Instrs.size() == 1 && NumDefCFAOffsets == 1 && StackSize == 2))
-        return CU::UNWIND_MODE_DWARF;
-
       SubtractInstrIdx += InstrOffset;
       ++StackAdjust;
 
@@ -813,9 +800,9 @@ public:
                          const MCSubtargetInfo &STI)
       : DarwinX86AsmBackend(T, MRI, STI, false) {}
 
-  std::unique_ptr<MCObjectWriter>
-  createObjectWriter(raw_pwrite_stream &OS) const override {
-    return createX86MachObjectWriter(OS, /*Is64Bit=*/false,
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    return createX86MachObjectWriter(/*Is64Bit=*/false,
                                      MachO::CPU_TYPE_I386,
                                      MachO::CPU_SUBTYPE_I386_ALL);
   }
@@ -834,10 +821,10 @@ public:
                          const MCSubtargetInfo &STI, MachO::CPUSubTypeX86 st)
       : DarwinX86AsmBackend(T, MRI, STI, true), Subtype(st) {}
 
-  std::unique_ptr<MCObjectWriter>
-  createObjectWriter(raw_pwrite_stream &OS) const override {
-    return createX86MachObjectWriter(OS, /*Is64Bit=*/true,
-                                     MachO::CPU_TYPE_X86_64, Subtype);
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    return createX86MachObjectWriter(/*Is64Bit=*/true, MachO::CPU_TYPE_X86_64,
+                                     Subtype);
   }
 
   /// Generate the compact unwind encoding for the CFI instructions.

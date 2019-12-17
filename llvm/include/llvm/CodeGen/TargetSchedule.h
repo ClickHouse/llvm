@@ -1,9 +1,8 @@
 //===- llvm/CodeGen/TargetSchedule.h - Sched Machine Model ------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -185,18 +184,20 @@ public:
   /// if converter after moving it to TargetSchedModel).
   unsigned computeInstrLatency(const MachineInstr *MI,
                                bool UseDefaultDefLatency = true) const;
+  unsigned computeInstrLatency(const MCInst &Inst) const;
   unsigned computeInstrLatency(unsigned Opcode) const;
 
 
   /// Output dependency latency of a pair of defs of the same register.
   ///
   /// This is typically one cycle.
-  unsigned computeOutputLatency(const MachineInstr *DefMI, unsigned DefIdx,
+  unsigned computeOutputLatency(const MachineInstr *DefMI, unsigned DefOperIdx,
                                 const MachineInstr *DepMI) const;
 
   /// Compute the reciprocal throughput of the given instruction.
-  Optional<double> computeReciprocalThroughput(const MachineInstr *MI) const;
-  Optional<double> computeReciprocalThroughput(unsigned Opcode) const;
+  double computeReciprocalThroughput(const MachineInstr *MI) const;
+  double computeReciprocalThroughput(const MCInst &MI) const;
+  double computeReciprocalThroughput(unsigned Opcode) const;
 };
 
 } // end namespace llvm

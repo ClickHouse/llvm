@@ -1,9 +1,8 @@
 //===-- llvm/BinaryFormat/Dwarf.h ---Dwarf Constants-------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -26,6 +25,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/FormatVariadicDetails.h"
+#include "llvm/ADT/Triple.h"
 
 namespace llvm {
 class StringRef;
@@ -129,7 +129,9 @@ enum LocationAtom {
 #include "llvm/BinaryFormat/Dwarf.def"
   DW_OP_lo_user = 0xe0,
   DW_OP_hi_user = 0xff,
-  DW_OP_LLVM_fragment = 0x1000 ///< Only used in LLVM metadata.
+  DW_OP_LLVM_fragment = 0x1000,   ///< Only used in LLVM metadata.
+  DW_OP_LLVM_convert = 0x1001,    ///< Only used in LLVM metadata.
+  DW_OP_LLVM_tag_offset = 0x1002, ///< Only used in LLVM metadata.
 };
 
 enum TypeKind : uint8_t {
@@ -150,9 +152,8 @@ enum DecimalSignEncoding {
 
 enum EndianityEncoding {
   // Endianity attribute values
-  DW_END_default = 0x00,
-  DW_END_big = 0x01,
-  DW_END_little = 0x02,
+#define HANDLE_DW_END(ID, NAME) DW_END_##NAME = ID,
+#include "llvm/BinaryFormat/Dwarf.def"
   DW_END_lo_user = 0x40,
   DW_END_hi_user = 0xff
 };
@@ -184,7 +185,8 @@ enum DefaultedMemberAttribute {
 };
 
 enum SourceLanguage {
-#define HANDLE_DW_LANG(ID, NAME, VERSION, VENDOR) DW_LANG_##NAME = ID,
+#define HANDLE_DW_LANG(ID, NAME, LOWER_BOUND, VERSION, VENDOR)                 \
+  DW_LANG_##NAME = ID,
 #include "llvm/BinaryFormat/Dwarf.def"
   DW_LANG_lo_user = 0x8000,
   DW_LANG_hi_user = 0xffff
@@ -273,6 +275,7 @@ enum RangeListEntries {
 /// Call frame instruction encodings.
 enum CallFrameInfo {
 #define HANDLE_DW_CFA(ID, NAME) DW_CFA_##NAME = ID,
+#define HANDLE_DW_CFA_PRED(ID, NAME, ARCH) DW_CFA_##NAME = ID,
 #include "llvm/BinaryFormat/Dwarf.def"
   DW_CFA_extended = 0x00,
 
@@ -431,7 +434,7 @@ StringRef LNStandardString(unsigned Standard);
 StringRef LNExtendedString(unsigned Encoding);
 StringRef MacinfoString(unsigned Encoding);
 StringRef RangeListEncodingString(unsigned Encoding);
-StringRef CallFrameString(unsigned Encoding);
+StringRef CallFrameString(unsigned Encoding, Triple::ArchType Arch);
 StringRef ApplePropertyString(unsigned);
 StringRef UnitTypeString(unsigned);
 StringRef AtomTypeString(unsigned Atom);
@@ -489,6 +492,8 @@ unsigned AttributeEncodingVendor(TypeKind E);
 unsigned LanguageVendor(SourceLanguage L);
 /// @}
 
+Optional<unsigned> LanguageLowerBound(SourceLanguage L);
+
 /// A helper struct providing information about the byte size of DW_FORM
 /// values that vary in size depending on the DWARF version, address byte
 /// size, or DWARF32/DWARF64.
@@ -539,6 +544,10 @@ bool isValidFormForVersion(Form F, unsigned Version, bool ExtensionsOk = true);
 /// Returns the symbolic string representing Val when used as a value
 /// for attribute Attr.
 StringRef AttributeValueString(uint16_t Attr, unsigned Val);
+
+/// Returns the symbolic string representing Val when used as a value
+/// for atom Atom.
+StringRef AtomValueString(uint16_t Atom, unsigned Val);
 
 /// Describes an entry of the various gnu_pub* debug sections.
 ///

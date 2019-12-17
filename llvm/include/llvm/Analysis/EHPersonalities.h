@@ -1,9 +1,8 @@
 //===- EHPersonalities.h - Compute EH-related information -----------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,7 +31,8 @@ enum class EHPersonality {
   MSVC_Win64SEH,
   MSVC_CXX,
   CoreCLR,
-  Rust
+  Rust,
+  Wasm_CXX
 };
 
 /// See if the given exception handling personality function is one
@@ -67,6 +67,22 @@ inline bool isFuncletEHPersonality(EHPersonality Pers) {
   case EHPersonality::MSVC_X86SEH:
   case EHPersonality::MSVC_Win64SEH:
   case EHPersonality::CoreCLR:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("invalid enum");
+}
+
+/// Returns true if this personality uses scope-style EH IR instructions:
+/// catchswitch, catchpad/ret, and cleanuppad/ret.
+inline bool isScopedEHPersonality(EHPersonality Pers) {
+  switch (Pers) {
+  case EHPersonality::MSVC_CXX:
+  case EHPersonality::MSVC_X86SEH:
+  case EHPersonality::MSVC_Win64SEH:
+  case EHPersonality::CoreCLR:
+  case EHPersonality::Wasm_CXX:
     return true;
   default:
     return false;

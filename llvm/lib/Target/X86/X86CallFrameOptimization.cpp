@@ -1,9 +1,8 @@
 //===----- X86CallFrameOptimization.cpp - Optimize x86 call sequences -----===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -56,18 +55,11 @@ static cl::opt<bool>
                cl::desc("Avoid optimizing x86 call frames for size"),
                cl::init(false), cl::Hidden);
 
-namespace llvm {
-void initializeX86CallFrameOptimizationPass(PassRegistry &);
-}
-
 namespace {
 
 class X86CallFrameOptimization : public MachineFunctionPass {
 public:
-  X86CallFrameOptimization() : MachineFunctionPass(ID) {
-    initializeX86CallFrameOptimizationPass(
-        *PassRegistry::getPassRegistry());
-  }
+  X86CallFrameOptimization() : MachineFunctionPass(ID) { }
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 

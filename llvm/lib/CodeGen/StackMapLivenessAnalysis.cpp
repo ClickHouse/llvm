@@ -1,9 +1,8 @@
 //===-- StackMapLivenessAnalysis.cpp - StackMap live Out Analysis ----------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -106,8 +105,8 @@ bool StackMapLiveness::runOnMachineFunction(MachineFunction &MF) {
   if (!EnablePatchPointLiveness)
     return false;
 
-  DEBUG(dbgs() << "********** COMPUTING STACKMAP LIVENESS: " << MF.getName()
-               << " **********\n");
+  LLVM_DEBUG(dbgs() << "********** COMPUTING STACKMAP LIVENESS: "
+                    << MF.getName() << " **********\n");
   TRI = MF.getSubtarget().getRegisterInfo();
   ++NumStackMapFuncVisited;
 
@@ -124,7 +123,7 @@ bool StackMapLiveness::calculateLiveness(MachineFunction &MF) {
   bool HasChanged = false;
   // For all basic blocks in the function.
   for (auto &MBB : MF) {
-    DEBUG(dbgs() << "****** BB " << MBB.getName() << " ******\n");
+    LLVM_DEBUG(dbgs() << "****** BB " << MBB.getName() << " ******\n");
     LiveRegs.init(*TRI);
     // FIXME: This should probably be addLiveOuts().
     LiveRegs.addLiveOutsNoPristines(MBB);
@@ -138,7 +137,7 @@ bool StackMapLiveness::calculateLiveness(MachineFunction &MF) {
         HasStackMap = true;
         ++NumStackMaps;
       }
-      DEBUG(dbgs() << "   " << LiveRegs << "   " << *I);
+      LLVM_DEBUG(dbgs() << "   " << LiveRegs << "   " << *I);
       LiveRegs.stepBackward(*I);
     }
     ++NumBBsVisited;
@@ -160,7 +159,7 @@ void StackMapLiveness::addLiveOutSetToMI(MachineFunction &MF,
 /// register live set.
 uint32_t *StackMapLiveness::createRegisterMask(MachineFunction &MF) const {
   // The mask is owned and cleaned up by the Machine Function.
-  uint32_t *Mask = MF.allocateRegisterMask(TRI->getNumRegs());
+  uint32_t *Mask = MF.allocateRegMask();
   for (auto Reg : LiveRegs)
     Mask[Reg / 32] |= 1U << (Reg % 32);
 

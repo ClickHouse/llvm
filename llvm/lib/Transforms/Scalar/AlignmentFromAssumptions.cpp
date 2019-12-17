@@ -1,10 +1,9 @@
 //===----------------------- AlignmentFromAssumptions.cpp -----------------===//
 //                  Set Load/Store Alignments From Assumptions
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -98,8 +97,8 @@ static unsigned getNewAlignmentDiff(const SCEV *DiffSCEV,
   const SCEV *DiffAlign = SE->getMulExpr(DiffAlignDiv, AlignSCEV);
   const SCEV *DiffUnitsSCEV = SE->getMinusSCEV(DiffAlign, DiffSCEV);
 
-  DEBUG(dbgs() << "\talignment relative to " << *AlignSCEV << " is " <<
-                  *DiffUnitsSCEV << " (diff: " << *DiffSCEV << ")\n");
+  LLVM_DEBUG(dbgs() << "\talignment relative to " << *AlignSCEV << " is "
+                    << *DiffUnitsSCEV << " (diff: " << *DiffSCEV << ")\n");
 
   if (const SCEVConstant *ConstDUSCEV =
       dyn_cast<SCEVConstant>(DiffUnitsSCEV)) {
@@ -139,12 +138,12 @@ static unsigned getNewAlignment(const SCEV *AASCEV, const SCEV *AlignSCEV,
   // address. This address is displaced by the provided offset.
   DiffSCEV = SE->getMinusSCEV(DiffSCEV, OffSCEV);
 
-  DEBUG(dbgs() << "AFI: alignment of " << *Ptr << " relative to " <<
-                  *AlignSCEV << " and offset " << *OffSCEV <<
-                  " using diff " << *DiffSCEV << "\n");
+  LLVM_DEBUG(dbgs() << "AFI: alignment of " << *Ptr << " relative to "
+                    << *AlignSCEV << " and offset " << *OffSCEV
+                    << " using diff " << *DiffSCEV << "\n");
 
   unsigned NewAlignment = getNewAlignmentDiff(DiffSCEV, AlignSCEV, SE);
-  DEBUG(dbgs() << "\tnew alignment: " << NewAlignment << "\n");
+  LLVM_DEBUG(dbgs() << "\tnew alignment: " << NewAlignment << "\n");
 
   if (NewAlignment) {
     return NewAlignment;
@@ -160,8 +159,8 @@ static unsigned getNewAlignment(const SCEV *AASCEV, const SCEV *AlignSCEV,
     const SCEV *DiffStartSCEV = DiffARSCEV->getStart();
     const SCEV *DiffIncSCEV = DiffARSCEV->getStepRecurrence(*SE);
 
-    DEBUG(dbgs() << "\ttrying start/inc alignment using start " <<
-                    *DiffStartSCEV << " and inc " << *DiffIncSCEV << "\n");
+    LLVM_DEBUG(dbgs() << "\ttrying start/inc alignment using start "
+                      << *DiffStartSCEV << " and inc " << *DiffIncSCEV << "\n");
 
     // Now compute the new alignment using the displacement to the value in the
     // first iteration, and also the alignment using the per-iteration delta.
@@ -170,26 +169,26 @@ static unsigned getNewAlignment(const SCEV *AASCEV, const SCEV *AlignSCEV,
     NewAlignment = getNewAlignmentDiff(DiffStartSCEV, AlignSCEV, SE);
     unsigned NewIncAlignment = getNewAlignmentDiff(DiffIncSCEV, AlignSCEV, SE);
 
-    DEBUG(dbgs() << "\tnew start alignment: " << NewAlignment << "\n");
-    DEBUG(dbgs() << "\tnew inc alignment: " << NewIncAlignment << "\n");
+    LLVM_DEBUG(dbgs() << "\tnew start alignment: " << NewAlignment << "\n");
+    LLVM_DEBUG(dbgs() << "\tnew inc alignment: " << NewIncAlignment << "\n");
 
     if (!NewAlignment || !NewIncAlignment) {
       return 0;
     } else if (NewAlignment > NewIncAlignment) {
       if (NewAlignment % NewIncAlignment == 0) {
-        DEBUG(dbgs() << "\tnew start/inc alignment: " <<
-                        NewIncAlignment << "\n");
+        LLVM_DEBUG(dbgs() << "\tnew start/inc alignment: " << NewIncAlignment
+                          << "\n");
         return NewIncAlignment;
       }
     } else if (NewIncAlignment > NewAlignment) {
       if (NewIncAlignment % NewAlignment == 0) {
-        DEBUG(dbgs() << "\tnew start/inc alignment: " <<
-                        NewAlignment << "\n");
+        LLVM_DEBUG(dbgs() << "\tnew start/inc alignment: " << NewAlignment
+                          << "\n");
         return NewAlignment;
       }
     } else if (NewIncAlignment == NewAlignment) {
-      DEBUG(dbgs() << "\tnew start/inc alignment: " <<
-                      NewAlignment << "\n");
+      LLVM_DEBUG(dbgs() << "\tnew start/inc alignment: " << NewAlignment
+                        << "\n");
       return NewAlignment;
     }
   }
@@ -280,7 +279,7 @@ bool AlignmentFromAssumptionsPass::extractAlignmentInfo(CallInst *I,
     return false;
 
   // Sign extend the offset to 64 bits (so that it is like all of the other
-  // expressions). 
+  // expressions).
   unsigned OffSCEVBits = OffSCEV->getType()->getPrimitiveSizeInBits();
   if (OffSCEVBits < 64)
     OffSCEV = SE->getSignExtendExpr(OffSCEV, Int64Ty);
@@ -339,7 +338,7 @@ bool AlignmentFromAssumptionsPass::processAssumption(CallInst *ACall) {
       unsigned NewDestAlignment = getNewAlignment(AASCEV, AlignSCEV, OffSCEV,
         MI->getDest(), SE);
 
-      DEBUG(dbgs() << "\tmem inst: " << NewDestAlignment << "\n";);
+      LLVM_DEBUG(dbgs() << "\tmem inst: " << NewDestAlignment << "\n";);
       if (NewDestAlignment > MI->getDestAlignment()) {
         MI->setDestAlignment(NewDestAlignment);
         ++NumMemIntAlignChanged;
@@ -351,7 +350,7 @@ bool AlignmentFromAssumptionsPass::processAssumption(CallInst *ACall) {
         unsigned NewSrcAlignment = getNewAlignment(AASCEV, AlignSCEV, OffSCEV,
           MTI->getSource(), SE);
 
-        DEBUG(dbgs() << "\tmem trans: " << NewSrcAlignment << "\n";);
+        LLVM_DEBUG(dbgs() << "\tmem trans: " << NewSrcAlignment << "\n";);
 
         if (NewSrcAlignment > MTI->getSourceAlignment()) {
           MTI->setSourceAlignment(NewSrcAlignment);

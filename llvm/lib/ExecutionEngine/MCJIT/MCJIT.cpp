@@ -1,9 +1,8 @@
 //===-- MCJIT.cpp - MC-based Just-in-Time Compiler ------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -95,7 +94,7 @@ MCJIT::~MCJIT() {
 
   for (auto &Obj : LoadedObjects)
     if (Obj)
-      NotifyFreeingObject(*Obj);
+      notifyFreeingObject(*Obj);
 
   Archives.clear();
 }
@@ -119,7 +118,7 @@ void MCJIT::addObjectFile(std::unique_ptr<object::ObjectFile> Obj) {
   if (Dyld.hasError())
     report_fatal_error(Dyld.getErrorString());
 
-  NotifyObjectEmitted(*Obj, *L);
+  notifyObjectLoaded(*Obj, *L);
 
   LoadedObjects.push_back(std::move(Obj));
 }
@@ -142,7 +141,13 @@ void MCJIT::setObjectCache(ObjectCache* NewCache) {
 }
 
 std::unique_ptr<MemoryBuffer> MCJIT::emitObject(Module *M) {
+  assert(M && "Can not emit a null module");
+
   MutexGuard locked(lock);
+
+  // Materialize all globals in the module if they have not been
+  // materialized already.
+  cantFail(M->materializeAll());
 
   // This must be a module which has already been added but not loaded to this
   // MCJIT instance, since these conditions are tested by our caller,
@@ -210,7 +215,7 @@ void MCJIT::generateCodeForModule(Module *M) {
   if (!LoadedObject) {
     std::string Buf;
     raw_string_ostream OS(Buf);
-    logAllUnhandledErrors(LoadedObject.takeError(), OS, "");
+    logAllUnhandledErrors(LoadedObject.takeError(), OS);
     OS.flush();
     report_fatal_error(Buf);
   }
@@ -220,7 +225,7 @@ void MCJIT::generateCodeForModule(Module *M) {
   if (Dyld.hasError())
     report_fatal_error(Dyld.getErrorString());
 
-  NotifyObjectEmitted(*LoadedObject.get(), *L);
+  notifyObjectLoaded(*LoadedObject.get(), *L);
 
   Buffers.push_back(std::move(ObjectToLoad));
   LoadedObjects.push_back(std::move(*LoadedObject));
@@ -320,8 +325,9 @@ uint64_t MCJIT::getSymbolAddress(const std::string &Name,
       return *AddrOrErr;
     else
       report_fatal_error(AddrOrErr.takeError());
-  } else
+  } else if (auto Err = Sym.takeError())
     report_fatal_error(Sym.takeError());
+  return 0;
 }
 
 JITSymbol MCJIT::findSymbol(const std::string &Name,
@@ -641,19 +647,23 @@ void MCJIT::UnregisterJITEventListener(JITEventListener *L) {
   }
 }
 
-void MCJIT::NotifyObjectEmitted(const object::ObjectFile& Obj,
-                                const RuntimeDyld::LoadedObjectInfo &L) {
+void MCJIT::notifyObjectLoaded(const object::ObjectFile &Obj,
+                               const RuntimeDyld::LoadedObjectInfo &L) {
+  uint64_t Key =
+      static_cast<uint64_t>(reinterpret_cast<uintptr_t>(Obj.getData().data()));
   MutexGuard locked(lock);
   MemMgr->notifyObjectLoaded(this, Obj);
   for (unsigned I = 0, S = EventListeners.size(); I < S; ++I) {
-    EventListeners[I]->NotifyObjectEmitted(Obj, L);
+    EventListeners[I]->notifyObjectLoaded(Key, Obj, L);
   }
 }
 
-void MCJIT::NotifyFreeingObject(const object::ObjectFile& Obj) {
+void MCJIT::notifyFreeingObject(const object::ObjectFile &Obj) {
+  uint64_t Key =
+      static_cast<uint64_t>(reinterpret_cast<uintptr_t>(Obj.getData().data()));
   MutexGuard locked(lock);
   for (JITEventListener *L : EventListeners)
-    L->NotifyFreeingObject(Obj);
+    L->notifyFreeingObject(Key);
 }
 
 JITSymbol

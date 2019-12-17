@@ -1,9 +1,8 @@
 //==- BlockFrequencyInfoImpl.h - Block Frequency Implementation --*- C++ -*-==//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -160,10 +159,6 @@ inline raw_ostream &operator<<(raw_ostream &OS, BlockMass X) {
 
 } // end namespace bfi_detail
 
-template <> struct isPodLike<bfi_detail::BlockMass> {
-  static const bool value = true;
-};
-
 /// Base class for BlockFrequencyInfoImpl
 ///
 /// BlockFrequencyInfoImplBase has supporting data structures and some
@@ -187,9 +182,9 @@ public:
   struct BlockNode {
     using IndexType = uint32_t;
 
-    IndexType Index = std::numeric_limits<uint32_t>::max();
+    IndexType Index;
 
-    BlockNode() = default;
+    BlockNode() : Index(std::numeric_limits<uint32_t>::max()) {}
     BlockNode(IndexType Index) : Index(Index) {}
 
     bool operator==(const BlockNode &X) const { return Index == X.Index; }
@@ -525,9 +520,11 @@ public:
 
   BlockFrequency getBlockFreq(const BlockNode &Node) const;
   Optional<uint64_t> getBlockProfileCount(const Function &F,
-                                          const BlockNode &Node) const;
+                                          const BlockNode &Node,
+                                          bool AllowSynthetic = false) const;
   Optional<uint64_t> getProfileCountFromFreq(const Function &F,
-                                             uint64_t Freq) const;
+                                             uint64_t Freq,
+                                             bool AllowSynthetic = false) const;
   bool isIrrLoopHeader(const BlockNode &Node);
 
   void setBlockFreq(const BlockNode &Node, uint64_t Freq);
@@ -973,13 +970,17 @@ public:
   }
 
   Optional<uint64_t> getBlockProfileCount(const Function &F,
-                                          const BlockT *BB) const {
-    return BlockFrequencyInfoImplBase::getBlockProfileCount(F, getNode(BB));
+                                          const BlockT *BB,
+                                          bool AllowSynthetic = false) const {
+    return BlockFrequencyInfoImplBase::getBlockProfileCount(F, getNode(BB),
+                                                            AllowSynthetic);
   }
 
   Optional<uint64_t> getProfileCountFromFreq(const Function &F,
-                                             uint64_t Freq) const {
-    return BlockFrequencyInfoImplBase::getProfileCountFromFreq(F, Freq);
+                                             uint64_t Freq,
+                                             bool AllowSynthetic = false) const {
+    return BlockFrequencyInfoImplBase::getProfileCountFromFreq(F, Freq,
+                                                               AllowSynthetic);
   }
 
   bool isIrrLoopHeader(const BlockT *BB) {
@@ -1030,8 +1031,9 @@ void BlockFrequencyInfoImpl<BT>::calculate(const FunctionT &F,
   Nodes.clear();
 
   // Initialize.
-  DEBUG(dbgs() << "\nblock-frequency: " << F.getName() << "\n================="
-               << std::string(F.getName().size(), '=') << "\n");
+  LLVM_DEBUG(dbgs() << "\nblock-frequency: " << F.getName()
+                    << "\n================="
+                    << std::string(F.getName().size(), '=') << "\n");
   initializeRPOT();
   initializeLoops();
 
@@ -1067,10 +1069,11 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeRPOT() {
   assert(RPOT.size() - 1 <= BlockNode::getMaxIndex() &&
          "More nodes in function than Block Frequency Info supports");
 
-  DEBUG(dbgs() << "reverse-post-order-traversal\n");
+  LLVM_DEBUG(dbgs() << "reverse-post-order-traversal\n");
   for (rpot_iterator I = rpot_begin(), E = rpot_end(); I != E; ++I) {
     BlockNode Node = getNode(I);
-    DEBUG(dbgs() << " - " << getIndex(I) << ": " << getBlockName(Node) << "\n");
+    LLVM_DEBUG(dbgs() << " - " << getIndex(I) << ": " << getBlockName(Node)
+                      << "\n");
     Nodes[*I] = Node;
   }
 
@@ -1081,7 +1084,7 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeRPOT() {
 }
 
 template <class BT> void BlockFrequencyInfoImpl<BT>::initializeLoops() {
-  DEBUG(dbgs() << "loop-detection\n");
+  LLVM_DEBUG(dbgs() << "loop-detection\n");
   if (LI->empty())
     return;
 
@@ -1099,7 +1102,7 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeLoops() {
 
     Loops.emplace_back(Parent, Header);
     Working[Header.Index].Loop = &Loops.back();
-    DEBUG(dbgs() << " - loop = " << getBlockName(Header) << "\n");
+    LLVM_DEBUG(dbgs() << " - loop = " << getBlockName(Header) << "\n");
 
     for (const LoopT *L : *Loop)
       Q.emplace_back(L, &Loops.back());
@@ -1128,8 +1131,8 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeLoops() {
 
     Working[Index].Loop = HeaderData.Loop;
     HeaderData.Loop->Nodes.push_back(Index);
-    DEBUG(dbgs() << " - loop = " << getBlockName(Header)
-                 << ": member = " << getBlockName(Index) << "\n");
+    LLVM_DEBUG(dbgs() << " - loop = " << getBlockName(Header)
+                      << ": member = " << getBlockName(Index) << "\n");
   }
 }
 
@@ -1150,10 +1153,10 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::computeMassInLoops() {
 template <class BT>
 bool BlockFrequencyInfoImpl<BT>::computeMassInLoop(LoopData &Loop) {
   // Compute mass in loop.
-  DEBUG(dbgs() << "compute-mass-in-loop: " << getLoopName(Loop) << "\n");
+  LLVM_DEBUG(dbgs() << "compute-mass-in-loop: " << getLoopName(Loop) << "\n");
 
   if (Loop.isIrreducible()) {
-    DEBUG(dbgs() << "isIrreducible = true\n");
+    LLVM_DEBUG(dbgs() << "isIrreducible = true\n");
     Distribution Dist;
     unsigned NumHeadersWithWeight = 0;
     Optional<uint64_t> MinHeaderWeight;
@@ -1165,14 +1168,14 @@ bool BlockFrequencyInfoImpl<BT>::computeMassInLoop(LoopData &Loop) {
       IsIrrLoopHeader.set(Loop.Nodes[H].Index);
       Optional<uint64_t> HeaderWeight = Block->getIrrLoopHeaderWeight();
       if (!HeaderWeight) {
-        DEBUG(dbgs() << "Missing irr loop header metadata on "
-              << getBlockName(HeaderNode) << "\n");
+        LLVM_DEBUG(dbgs() << "Missing irr loop header metadata on "
+                          << getBlockName(HeaderNode) << "\n");
         HeadersWithoutWeight.insert(H);
         continue;
       }
-      DEBUG(dbgs() << getBlockName(HeaderNode)
-            << " has irr loop header weight " << HeaderWeight.getValue()
-            << "\n");
+      LLVM_DEBUG(dbgs() << getBlockName(HeaderNode)
+                        << " has irr loop header weight "
+                        << HeaderWeight.getValue() << "\n");
       NumHeadersWithWeight++;
       uint64_t HeaderWeightValue = HeaderWeight.getValue();
       if (!MinHeaderWeight || HeaderWeightValue < MinHeaderWeight)
@@ -1194,8 +1197,8 @@ bool BlockFrequencyInfoImpl<BT>::computeMassInLoop(LoopData &Loop) {
       assert(!getBlock(HeaderNode)->getIrrLoopHeaderWeight() &&
              "Shouldn't have a weight metadata");
       uint64_t MinWeight = MinHeaderWeight.getValue();
-      DEBUG(dbgs() << "Giving weight " << MinWeight
-            << " to " << getBlockName(HeaderNode) << "\n");
+      LLVM_DEBUG(dbgs() << "Giving weight " << MinWeight << " to "
+                        << getBlockName(HeaderNode) << "\n");
       if (MinWeight)
         Dist.addLocal(HeaderNode, MinWeight);
     }
@@ -1224,7 +1227,7 @@ bool BlockFrequencyInfoImpl<BT>::computeMassInLoop(LoopData &Loop) {
 template <class BT>
 bool BlockFrequencyInfoImpl<BT>::tryToComputeMassInFunction() {
   // Compute mass in function.
-  DEBUG(dbgs() << "compute-mass-in-function\n");
+  LLVM_DEBUG(dbgs() << "compute-mass-in-function\n");
   assert(!Working.empty() && "no blocks in function");
   assert(!Working[0].isLoopHeader() && "entry block is a loop header");
 
@@ -1276,9 +1279,10 @@ template <class BT> struct BlockEdgesAdder {
 template <class BT>
 void BlockFrequencyInfoImpl<BT>::computeIrreducibleMass(
     LoopData *OuterLoop, std::list<LoopData>::iterator Insert) {
-  DEBUG(dbgs() << "analyze-irreducible-in-";
-        if (OuterLoop) dbgs() << "loop: " << getLoopName(*OuterLoop) << "\n";
-        else dbgs() << "function\n");
+  LLVM_DEBUG(dbgs() << "analyze-irreducible-in-";
+             if (OuterLoop) dbgs()
+             << "loop: " << getLoopName(*OuterLoop) << "\n";
+             else dbgs() << "function\n");
 
   using namespace bfi_detail;
 
@@ -1304,7 +1308,7 @@ template <class BT>
 bool
 BlockFrequencyInfoImpl<BT>::propagateMassToSuccessors(LoopData *OuterLoop,
                                                       const BlockNode &Node) {
-  DEBUG(dbgs() << " - node: " << getBlockName(Node) << "\n");
+  LLVM_DEBUG(dbgs() << " - node: " << getBlockName(Node) << "\n");
   // Calculate probability for successors.
   Distribution Dist;
   if (auto *Loop = Working[Node.Index].getPackagedLoop()) {

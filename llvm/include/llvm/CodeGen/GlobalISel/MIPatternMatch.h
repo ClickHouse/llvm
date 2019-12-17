@@ -1,9 +1,8 @@
-//== ----- llvm/CodeGen/GlobalISel/MIPatternMatch.h --------------------- == //
+//==------ llvm/CodeGen/GlobalISel/MIPatternMatch.h -------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -31,8 +30,7 @@ template <typename SubPatternT> struct OneUse_match {
   SubPatternT SubPat;
   OneUse_match(const SubPatternT &SP) : SubPat(SP) {}
 
-  template <typename OpTy>
-  bool match(const MachineRegisterInfo &MRI, unsigned Reg) {
+  bool match(MachineRegisterInfo &MRI, unsigned Reg) {
     return MRI.hasOneUse(Reg) && SubPat.match(MRI, Reg);
   }
 };
@@ -162,7 +160,7 @@ template <typename Class> struct bind_ty {
   }
 };
 
-inline bind_ty<unsigned> m_Reg(unsigned &R) { return R; }
+inline bind_ty<Register> m_Reg(Register &R) { return R; }
 inline bind_ty<MachineInstr *> m_MInstr(MachineInstr *&MI) { return MI; }
 inline bind_ty<LLT> m_Type(LLT &Ty) { return Ty; }
 
@@ -219,6 +217,12 @@ template <typename LHS, typename RHS>
 inline BinaryOp_match<LHS, RHS, TargetOpcode::G_FMUL, true>
 m_GFMul(const LHS &L, const RHS &R) {
   return BinaryOp_match<LHS, RHS, TargetOpcode::G_FMUL, true>(L, R);
+}
+
+template <typename LHS, typename RHS>
+inline BinaryOp_match<LHS, RHS, TargetOpcode::G_FSUB, false>
+m_GFSub(const LHS &L, const RHS &R) {
+  return BinaryOp_match<LHS, RHS, TargetOpcode::G_FSUB, false>(L, R);
 }
 
 template <typename LHS, typename RHS>
@@ -302,6 +306,11 @@ m_GFPTrunc(const SrcTy &Src) {
 template <typename SrcTy>
 inline UnaryOp_match<SrcTy, TargetOpcode::G_FABS> m_GFabs(const SrcTy &Src) {
   return UnaryOp_match<SrcTy, TargetOpcode::G_FABS>(Src);
+}
+
+template <typename SrcTy>
+inline UnaryOp_match<SrcTy, TargetOpcode::G_FNEG> m_GFNeg(const SrcTy &Src) {
+  return UnaryOp_match<SrcTy, TargetOpcode::G_FNEG>(Src);
 }
 
 template <typename SrcTy>

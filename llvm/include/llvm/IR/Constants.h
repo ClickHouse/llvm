@@ -1,9 +1,8 @@
 //===-- llvm/Constants.h - Constant class subclass definitions --*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -290,7 +289,11 @@ public:
 
   static Constant *get(Type* Ty, StringRef Str);
   static ConstantFP *get(LLVMContext &Context, const APFloat &V);
-  static Constant *getNaN(Type *Ty, bool Negative = false, unsigned type = 0);
+  static Constant *getNaN(Type *Ty, bool Negative = false, uint64_t Payload = 0);
+  static Constant *getQNaN(Type *Ty, bool Negative = false,
+                           APInt *Payload = nullptr);
+  static Constant *getSNaN(Type *Ty, bool Negative = false,
+                           APInt *Payload = nullptr);
   static Constant *getNegativeZero(Type *Ty);
   static Constant *getInfinity(Type *Ty, bool Negative = false);
 
@@ -698,9 +701,8 @@ public:
   template <typename ElementTy>
   static Constant *get(LLVMContext &Context, ArrayRef<ElementTy> Elts) {
     const char *Data = reinterpret_cast<const char *>(Elts.data());
-    Type *Ty =
-        ArrayType::get(Type::getScalarTy<ElementTy>(Context), Elts.size());
-    return getImpl(StringRef(Data, Elts.size() * sizeof(ElementTy)), Ty);
+    return getRaw(StringRef(Data, Elts.size() * sizeof(ElementTy)), Elts.size(),
+                  Type::getScalarTy<ElementTy>(Context));
   }
 
   /// get() constructor - ArrayTy needs to be compatible with
@@ -708,6 +710,17 @@ public:
   template <typename ArrayTy>
   static Constant *get(LLVMContext &Context, ArrayTy &Elts) {
     return ConstantDataArray::get(Context, makeArrayRef(Elts));
+  }
+
+  /// get() constructor - Return a constant with array type with an element
+  /// count and element type matching the NumElements and ElementTy parameters
+  /// passed in. Note that this can return a ConstantAggregateZero object.
+  /// ElementTy needs to be one of i8/i16/i32/i64/float/double. Data is the
+  /// buffer containing the elements. Be careful to make sure Data uses the
+  /// right endianness, the buffer will be used as-is.
+  static Constant *getRaw(StringRef Data, uint64_t NumElements, Type *ElementTy) {
+    Type *Ty = ArrayType::get(ElementTy, NumElements);
+    return getImpl(Data, Ty);
   }
 
   /// getFP() constructors - Return a constant with array type with an element
@@ -1008,10 +1021,15 @@ public:
     return getLShr(C1, C2, true);
   }
 
-  /// Return the identity for the given binary operation,
-  /// i.e. a constant C such that X op C = X and C op X = X for every X.  It
-  /// returns null if the operator doesn't have an identity.
-  static Constant *getBinOpIdentity(unsigned Opcode, Type *Ty);
+  /// Return the identity constant for a binary opcode.
+  /// The identity constant C is defined as X op C = X and C op X = X for every
+  /// X when the binary operation is commutative. If the binop is not
+  /// commutative, callers can acquire the operand 1 identity constant by
+  /// setting AllowRHSConstant to true. For example, any shift has a zero
+  /// identity constant for operand 1: X shift 0 = X.
+  /// Return nullptr if the operator does not have an identity constant.
+  static Constant *getBinOpIdentity(unsigned Opcode, Type *Ty,
+                                    bool AllowRHSConstant = false);
 
   /// Return the absorbing element for the given binary
   /// operation, i.e. a constant C such that X op C = C and C op X = C for
@@ -1098,6 +1116,13 @@ public:
   /// \param OnlyIfReducedTy see \a getWithOperands() docs.
   static Constant *getSelect(Constant *C, Constant *V1, Constant *V2,
                              Type *OnlyIfReducedTy = nullptr);
+
+  /// get - Return a unary operator constant expression,
+  /// folding if possible.
+  ///
+  /// \param OnlyIfReducedTy see \a getWithOperands() docs.
+  static Constant *get(unsigned Opcode, Constant *C1, unsigned Flags = 0, 
+                       Type *OnlyIfReducedTy = nullptr);
 
   /// get - Return a binary or shift operator constant expression,
   /// folding if possible.

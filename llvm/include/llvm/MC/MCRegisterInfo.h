@@ -1,9 +1,8 @@
 //===- MC/MCRegisterInfo.h - Target Register Description --------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -41,7 +40,6 @@ public:
   const uint16_t RegsSize;
   const uint16_t RegSetSize;
   const uint16_t ID;
-  const uint16_t PhysRegSize;
   const int8_t CopyCost;
   const bool Allocatable;
 
@@ -79,11 +77,6 @@ public:
   bool contains(unsigned Reg1, unsigned Reg2) const {
     return contains(Reg1) && contains(Reg2);
   }
-
-  /// Return the size of the physical register in bytes.
-  unsigned getPhysRegSize() const { return PhysRegSize; }
-  /// Temporary function to allow out-of-tree targets to switch.
-  unsigned getSize() const { return getPhysRegSize(); }
 
   /// getCopyCost - Return the cost of copying a value between two registers in
   /// this class. A negative number means the register class is very expensive

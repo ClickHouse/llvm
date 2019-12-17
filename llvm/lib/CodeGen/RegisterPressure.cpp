@@ -1,9 +1,8 @@
 //===- RegisterPressure.cpp - Dynamic Register Pressure -------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -681,8 +680,7 @@ void PressureDiff::addPressureChange(unsigned RegUnit, bool IsDec,
       PressureDiff::iterator J;
       for (J = std::next(I); J != E && J->isValid(); ++J, ++I)
         *I = *J;
-      if (J != E)
-        *I = *J;
+      *I = PressureChange();
     }
   }
 }
@@ -847,7 +845,7 @@ void RegPressureTracker::recedeSkipDebugValues() {
   CurrPos = skipDebugInstructionsBackward(std::prev(CurrPos), MBB->begin());
 
   SlotIndex SlotIdx;
-  if (RequireIntervals)
+  if (RequireIntervals && !CurrPos->isDebugInstr())
     SlotIdx = LIS->getInstructionIndex(*CurrPos).getRegSlot();
 
   // Open the top of the region using slot indexes.
@@ -857,6 +855,12 @@ void RegPressureTracker::recedeSkipDebugValues() {
 
 void RegPressureTracker::recede(SmallVectorImpl<RegisterMaskPair> *LiveUses) {
   recedeSkipDebugValues();
+  if (CurrPos->isDebugValue()) {
+    // It's possible to only have debug_value instructions and hit the start of
+    // the block.
+    assert(CurrPos == MBB->begin());
+    return;
+  }
 
   const MachineInstr &MI = *CurrPos;
   RegisterOperands RegOpers;

@@ -1,9 +1,8 @@
 //===-- llvm/CodeGen/MachineOperand.h - MachineOperand class ----*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,6 +14,7 @@
 #define LLVM_CODEGEN_MACHINEOPERAND_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/CodeGen/Register.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/LowLevelTypeImpl.h"
@@ -346,9 +346,9 @@ public:
   //===--------------------------------------------------------------------===//
 
   /// getReg - Returns the register number.
-  unsigned getReg() const {
+  Register getReg() const {
     assert(isReg() && "This is not a register operand!");
-    return SmallContents.RegNo;
+    return Register(SmallContents.RegNo);
   }
 
   unsigned getSubReg() const {
@@ -616,6 +616,11 @@ public:
     return Contents.RegMask;
   }
 
+  /// Returns number of elements needed for a regmask array.
+  static unsigned getRegMaskSize(unsigned NumRegs) {
+    return (NumRegs + 31) / 32;
+  }
+
   /// getRegLiveOut - Returns a bit mask of live-out registers.
   const uint32_t *getRegLiveOut() const {
     assert(isRegLiveOut() && "Wrong MachineOperand accessor");
@@ -634,6 +639,11 @@ public:
   void setImm(int64_t immVal) {
     assert(isImm() && "Wrong MachineOperand mutator");
     Contents.ImmVal = immVal;
+  }
+
+  void setCImm(const ConstantInt *CI) {
+    assert(isCImm() && "Wrong MachineOperand mutator");
+    Contents.CI = CI;
   }
 
   void setFPImm(const ConstantFP *CFP) {
@@ -674,6 +684,11 @@ public:
     Contents.RegMask = RegMaskPtr;
   }
 
+  void setPredicate(unsigned Predicate) {
+    assert(isPredicate() && "Wrong MachineOperand mutator");
+    Contents.Pred = Predicate;
+  }
+
   //===--------------------------------------------------------------------===//
   // Other methods.
   //===--------------------------------------------------------------------===//
@@ -703,6 +718,10 @@ public:
 
   /// ChangeToES - Replace this operand with a new external symbol operand.
   void ChangeToES(const char *SymName, unsigned char TargetFlags = 0);
+
+  /// ChangeToGA - Replace this operand with a new global address operand.
+  void ChangeToGA(const GlobalValue *GV, int64_t Offset,
+                  unsigned char TargetFlags = 0);
 
   /// ChangeToMCSymbol - Replace this operand with a new MC symbol operand.
   void ChangeToMCSymbol(MCSymbol *Sym);

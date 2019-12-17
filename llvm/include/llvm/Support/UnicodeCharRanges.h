@@ -1,9 +1,8 @@
 //===--- UnicodeCharRanges.h - Types and functions for character ranges ---===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 #ifndef LLVM_SUPPORT_UNICODECHARRANGES_H
@@ -77,17 +76,17 @@ private:
     for (CharRanges::const_iterator I = Ranges.begin(), E = Ranges.end();
          I != E; ++I) {
       if (I != Ranges.begin() && Prev >= I->Lower) {
-        DEBUG(dbgs() << "Upper bound 0x");
-        DEBUG(dbgs().write_hex(Prev));
-        DEBUG(dbgs() << " should be less than succeeding lower bound 0x");
-        DEBUG(dbgs().write_hex(I->Lower) << "\n");
+        LLVM_DEBUG(dbgs() << "Upper bound 0x");
+        LLVM_DEBUG(dbgs().write_hex(Prev));
+        LLVM_DEBUG(dbgs() << " should be less than succeeding lower bound 0x");
+        LLVM_DEBUG(dbgs().write_hex(I->Lower) << "\n");
         return false;
       }
       if (I->Upper < I->Lower) {
-        DEBUG(dbgs() << "Upper bound 0x");
-        DEBUG(dbgs().write_hex(I->Lower));
-        DEBUG(dbgs() << " should not be less than lower bound 0x");
-        DEBUG(dbgs().write_hex(I->Upper) << "\n");
+        LLVM_DEBUG(dbgs() << "Upper bound 0x");
+        LLVM_DEBUG(dbgs().write_hex(I->Lower));
+        LLVM_DEBUG(dbgs() << " should not be less than lower bound 0x");
+        LLVM_DEBUG(dbgs().write_hex(I->Upper) << "\n");
         return false;
       }
       Prev = I->Upper;

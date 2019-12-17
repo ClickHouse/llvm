@@ -1,9 +1,8 @@
 //===- llvm/Support/ErrorOr.h - Error Smart Pointer -------------*- C++ -*-===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -23,18 +22,6 @@
 #include <utility>
 
 namespace llvm {
-
-/// Stores a reference that can be changed.
-template <typename T>
-class ReferenceStorage {
-  T *Storage;
-
-public:
-  ReferenceStorage(T &Ref) : Storage(&Ref) {}
-
-  operator T &() const { return *Storage; }
-  T &get() const { return *Storage; }
-};
 
 /// Represents either an error or a value T.
 ///
@@ -71,7 +58,7 @@ class ErrorOr {
 
   static const bool isRef = std::is_reference<T>::value;
 
-  using wrap = ReferenceStorage<typename std::remove_reference<T>::type>;
+  using wrap = std::reference_wrapper<typename std::remove_reference<T>::type>;
 
 public:
   using storage_type = typename std::conditional<isRef, wrap, T>::type;
