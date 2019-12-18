@@ -932,7 +932,7 @@ foreach( binding ${LLVM_BINDINGS_LIST} )
   endif()
 endforeach()
 
-add_subdirectory(projects)
+#add_subdirectory(projects)
 
 if( LLVM_INCLUDE_TOOLS )
   add_subdirectory(tools)

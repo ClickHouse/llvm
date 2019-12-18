@@ -15,7 +15,7 @@
 ;===------------------------------------------------------------------------===;
 
 [common]
-subdirectories = lib projects utils
+subdirectories = lib utils
 
 [component_0]
 type = Group
