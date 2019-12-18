@@ -504,9 +504,9 @@ endif()
 # components which may not strictly be necessary (tools, examples, and tests).
 #
 # This is primarily to support building smaller or faster project files.
-option(LLVM_INCLUDE_TOOLS "Generate build targets for the LLVM tools." ON)
+option(LLVM_INCLUDE_TOOLS "Generate build targets for the LLVM tools." OFF)
 option(LLVM_BUILD_TOOLS
-  "Build the LLVM tools. If OFF, just generate build targets." ON)
+  "Build the LLVM tools. If OFF, just generate build targets." OFF)
 
 option(LLVM_INCLUDE_UTILS "Generate build targets for the LLVM utils." OFF)
 option(LLVM_BUILD_UTILS
