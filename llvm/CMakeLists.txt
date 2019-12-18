@@ -1,3 +1,7 @@
+# This was added for ClickHouse to lower binary size.
+add_definitions(-g0)
+
+
 # See docs/CMake.html for instructions about how to build LLVM with CMake.
 
 cmake_minimum_required(VERSION 3.4.3)
