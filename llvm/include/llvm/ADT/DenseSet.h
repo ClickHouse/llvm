@@ -124,8 +124,8 @@ public:
 
     Iterator& operator++() { ++I; return *this; }
     Iterator operator++(int) { auto T = *this; ++I; return T; }
-    bool operator==(const ConstIterator& X) const { return I == X.I; }
-    bool operator!=(const ConstIterator& X) const { return I != X.I; }
+    bool operator==(const Iterator& X) const { return I == X.I; }
+    bool operator!=(const Iterator& X) const { return I != X.I; }
   };
 
   class ConstIterator {
