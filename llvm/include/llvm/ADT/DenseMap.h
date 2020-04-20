@@ -1231,14 +1231,14 @@ public:
     return Ptr;
   }
 
-  bool operator==(const ConstIterator &RHS) const {
+  bool operator==(const DenseMapIterator &RHS) const {
     assert((!Ptr || isHandleInSync()) && "handle not in sync!");
     assert((!RHS.Ptr || RHS.isHandleInSync()) && "handle not in sync!");
     assert(getEpochAddress() == RHS.getEpochAddress() &&
            "comparing incomparable iterators!");
     return Ptr == RHS.Ptr;
   }
-  bool operator!=(const ConstIterator &RHS) const {
+  bool operator!=(const DenseMapIterator &RHS) const {
     assert((!Ptr || isHandleInSync()) && "handle not in sync!");
     assert((!RHS.Ptr || RHS.isHandleInSync()) && "handle not in sync!");
     assert(getEpochAddress() == RHS.getEpochAddress() &&

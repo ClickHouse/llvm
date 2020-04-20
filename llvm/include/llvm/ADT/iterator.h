@@ -142,28 +142,28 @@ public:
     return tmp;
   }
 
-  bool operator!=(const DerivedT &RHS) const {
-    return !static_cast<const DerivedT *>(this)->operator==(RHS);
+  bool operator!=(const iterator_facade_base &RHS) const {
+    return !static_cast<const DerivedT *>(this)->operator==(static_cast<const DerivedT &>(RHS));
   }
 
-  bool operator>(const DerivedT &RHS) const {
+  bool operator>(const iterator_facade_base &RHS) const {
     static_assert(
         IsRandomAccess,
         "Relational operators are only defined for random access iterators.");
-    return !static_cast<const DerivedT *>(this)->operator<(RHS) &&
-           !static_cast<const DerivedT *>(this)->operator==(RHS);
+    return !static_cast<const DerivedT *>(this)->operator<(static_cast<const DerivedT &>(RHS)) &&
+           !static_cast<const DerivedT *>(this)->operator==(static_cast<const DerivedT &>(RHS));
   }
-  bool operator<=(const DerivedT &RHS) const {
+  bool operator<=(const iterator_facade_base &RHS) const {
     static_assert(
         IsRandomAccess,
         "Relational operators are only defined for random access iterators.");
-    return !static_cast<const DerivedT *>(this)->operator>(RHS);
+    return !static_cast<const DerivedT *>(this)->operator>(static_cast<const DerivedT &>(RHS));
   }
-  bool operator>=(const DerivedT &RHS) const {
+  bool operator>=(const iterator_facade_base &RHS) const {
     static_assert(
         IsRandomAccess,
         "Relational operators are only defined for random access iterators.");
-    return !static_cast<const DerivedT *>(this)->operator<(RHS);
+    return !static_cast<const DerivedT *>(this)->operator<(static_cast<const DerivedT &>(RHS));
   }
 
   PointerT operator->() { return &static_cast<DerivedT *>(this)->operator*(); }
@@ -260,8 +260,8 @@ public:
     return *static_cast<DerivedT *>(this);
   }
 
-  bool operator==(const DerivedT &RHS) const { return I == RHS.I; }
-  bool operator<(const DerivedT &RHS) const {
+  bool operator==(const iterator_adaptor_base &RHS) const { return I == RHS.I; }
+  bool operator<(const iterator_adaptor_base &RHS) const {
     static_assert(
         BaseT::IsRandomAccess,
         "Relational operators are only defined for random access iterators.");
