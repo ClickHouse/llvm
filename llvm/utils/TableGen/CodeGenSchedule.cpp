@@ -371,19 +371,21 @@ processSTIPredicate(STIPredicateFunction &Fn,
                const std::pair<APInt, APInt> &LhsMasks = OpcodeMasks[LhsIdx];
                const std::pair<APInt, APInt> &RhsMasks = OpcodeMasks[RhsIdx];
 
-               auto LessThan = [](const APInt &Lhs, const APInt &Rhs) {
-                 unsigned LhsCountPopulation = Lhs.countPopulation();
-                 unsigned RhsCountPopulation = Rhs.countPopulation();
+               if (LhsMasks.first != RhsMasks.first) {
+                 unsigned LhsCountPopulation = LhsMasks.first.countPopulation();
+                 unsigned RhsCountPopulation = RhsMasks.first.countPopulation();
                  return ((LhsCountPopulation < RhsCountPopulation) ||
                          ((LhsCountPopulation == RhsCountPopulation) &&
-                          (Lhs.countLeadingZeros() > Rhs.countLeadingZeros())));
-               };
+                          (LhsMasks.first.countLeadingZeros() > RhsMasks.first.countLeadingZeros())));
+               }
 
-               if (LhsMasks.first != RhsMasks.first)
-                 return LessThan(LhsMasks.first, RhsMasks.first);
-
-               if (LhsMasks.second != RhsMasks.second)
-                 return LessThan(LhsMasks.second, RhsMasks.second);
+               if (LhsMasks.second != RhsMasks.second) {
+                 unsigned LhsCountPopulation = LhsMasks.second.countPopulation();
+                 unsigned RhsCountPopulation = RhsMasks.second.countPopulation();
+                 return ((LhsCountPopulation < RhsCountPopulation) ||
+                         ((LhsCountPopulation == RhsCountPopulation) &&
+                          (LhsMasks.second.countLeadingZeros() > RhsMasks.second.countLeadingZeros())));
+               }
 
                return LhsIdx < RhsIdx;
              });

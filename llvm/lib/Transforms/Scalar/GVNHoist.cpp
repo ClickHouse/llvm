@@ -706,8 +706,15 @@ private:
       auto TI = BB->getTerminator();
       auto B = CHIs.begin();
       // [PreIt, PHIIt) form a range of CHIs which have identical VNs.
-      auto PHIIt = std::find_if(CHIs.begin(), CHIs.end(),
-                                 [B](CHIArg &A) { return A != *B; });
+
+      SmallVectorImpl<CHIArg>::iterator PHIIt = CHIs.end();
+      for (auto it = CHIs.begin(); it != CHIs.end(); ++it) {
+        if (*it != *B) {
+          PHIIt = it;
+          break;
+        }
+      }
+
       auto PrevIt = CHIs.begin();
       while (PrevIt != PHIIt) {
         // Collect values which satisfy safety checks.
@@ -728,8 +735,12 @@ private:
 
         // Check other VNs
         PrevIt = PHIIt;
-        PHIIt = std::find_if(PrevIt, CHIs.end(),
-                             [PrevIt](CHIArg &A) { return A != *PrevIt; });
+        for (auto it = PrevIt; it != CHIs.end(); ++it) {
+          if (*it != *PrevIt) {
+            PHIIt = it;
+            break;
+          }
+        }
       }
     }
   }
