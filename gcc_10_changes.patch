@@ -1,0 +1,51 @@
+diff --git a/llvm/CMakeLists.txt b/llvm/CMakeLists.txt
+index 56981cf68964..1d2b4e227e78 100644
+--- a/llvm/CMakeLists.txt
++++ b/llvm/CMakeLists.txt
+@@ -45,6 +45,11 @@ set (LLVM_INCLUDE_DOCS 0)
+ set (LLVM_INCLUDE_BENCHMARKS 0)
+ set (LLVM_ENABLE_ZLIB 0)
+ set (LLVM_ENABLE_BINDINGS 0)
++set (LLVM_ENABLE_Z3_SOLVER 0)
++
++add_definitions(
++    -g0             # To lower object size
++)
+ 
+ # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
+ # New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
+diff --git a/llvm/lib/Transforms/Scalar/GVNHoist.cpp b/llvm/lib/Transforms/Scalar/GVNHoist.cpp
+index 8d0bd5674964..3d6ef16a9b87 100644
+--- a/llvm/lib/Transforms/Scalar/GVNHoist.cpp
++++ b/llvm/lib/Transforms/Scalar/GVNHoist.cpp
+@@ -887,7 +887,7 @@ void GVNHoist::findHoistableCandidates(OutValuesType &CHIBBs,
+     auto TI = BB->getTerminator();
+     auto B = CHIs.begin();
+     // [PreIt, PHIIt) form a range of CHIs which have identical VNs.
+-    auto PHIIt = llvm::find_if(CHIs, [B](CHIArg &A) { return A != *B; });
++    auto PHIIt = llvm::find_if(CHIs, [B](auto &A) { return A != *B; });
+     auto PrevIt = CHIs.begin();
+     while (PrevIt != PHIIt) {
+       // Collect values which satisfy safety checks.
+@@ -909,7 +909,7 @@ void GVNHoist::findHoistableCandidates(OutValuesType &CHIBBs,
+       // Check other VNs
+       PrevIt = PHIIt;
+       PHIIt = std::find_if(PrevIt, CHIs.end(),
+-                           [PrevIt](CHIArg &A) { return A != *PrevIt; });
++                           [PrevIt](auto &A) { return A != *PrevIt; });
+     }
+   }
+ }
+diff --git a/llvm/utils/TableGen/CodeGenSchedule.cpp b/llvm/utils/TableGen/CodeGenSchedule.cpp
+index b20eb6eff422..caf19431dc3f 100644
+--- a/llvm/utils/TableGen/CodeGenSchedule.cpp
++++ b/llvm/utils/TableGen/CodeGenSchedule.cpp
+@@ -370,7 +370,7 @@ processSTIPredicate(STIPredicateFunction &Fn,
+                const std::pair<APInt, APInt> &LhsMasks = OpcodeMasks[LhsIdx];
+                const std::pair<APInt, APInt> &RhsMasks = OpcodeMasks[RhsIdx];
+ 
+-               auto LessThan = [](const APInt &Lhs, const APInt &Rhs) {
++               auto LessThan = [](auto &Lhs, auto &Rhs) {
+                  unsigned LhsCountPopulation = Lhs.countPopulation();
+                  unsigned RhsCountPopulation = Rhs.countPopulation();
+                  return ((LhsCountPopulation < RhsCountPopulation) ||
