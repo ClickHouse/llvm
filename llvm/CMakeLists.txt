@@ -20,32 +20,6 @@ endif()
 # ClickHouse specific options
 
 set (LLVM_ENABLE_PROJECTS "")
-set (LLVM_ENABLE_BACKTRACES 0)
-set (LLVM_ENABLE_CRASH_OVERRIDES 0)
-set (LLVM_ENABLE_FFI 0)
-set (LLVM_ENABLE_TERMINFO 0)
-set (LLVM_ENABLE_LIBXML2 0)
-set (LLVM_ENABLE_LIBEDIT 0)
-set (LLVM_ENABLE_LIBPFM 0)
-set (LLVM_ENABLE_OCAMLDOC 0)
-set (LLVM_INCLUDE_UTILS 0)
-set (LLVM_BUILD_UTILS 0)
-set (LLVM_INCLUDE_RUNTIMES 0)
-set (LLVM_BUILD_RUNTIMES 0)
-set (LLVM_BUILD_RUNTIME 0)
-set (LLVM_BUILD_EXAMPLES 0)
-set (LLVM_INCLUDE_EXAMPLES 0)
-set (LLVM_BUILD_TOOLS 0)
-set (LLVM_INCLUDE_TOOLS 0)
-set (LLVM_BUILD_TESTS 0)
-set (LLVM_INCLUDE_TESTS 0)
-set (LLVM_INCLUDE_GO_TESTS 0)
-set (LLVM_BUILD_DOCS 0)
-set (LLVM_INCLUDE_DOCS 0)
-set (LLVM_INCLUDE_BENCHMARKS 0)
-set (LLVM_ENABLE_ZLIB 0)
-set (LLVM_ENABLE_BINDINGS 0)
-set (LLVM_ENABLE_Z3_SOLVER 0)
 
 add_definitions(
     -g0             # To lower object size
@@ -360,14 +334,14 @@ set(LLVM_EXPERIMENTAL_TARGETS_TO_BUILD ""
 option(BUILD_SHARED_LIBS
   "Build all libraries as shared libraries instead of static" OFF)
 
-option(LLVM_ENABLE_BACKTRACES "Enable embedding backtraces on crash." ON)
+option(LLVM_ENABLE_BACKTRACES "Enable embedding backtraces on crash." OFF)
 if(LLVM_ENABLE_BACKTRACES)
   set(ENABLE_BACKTRACES 1)
 endif()
 
 option(LLVM_ENABLE_UNWIND_TABLES "Emit unwind tables for the libraries" ON)
 
-option(LLVM_ENABLE_CRASH_OVERRIDES "Enable crash overrides." ON)
+option(LLVM_ENABLE_CRASH_OVERRIDES "Enable crash overrides." OFF)
 if(LLVM_ENABLE_CRASH_OVERRIDES)
   set(ENABLE_CRASH_OVERRIDES 1)
 endif()
@@ -381,13 +355,13 @@ set(FFI_INCLUDE_DIR "" CACHE PATH "Additional directory, where CMake should sear
 set(LLVM_TARGET_ARCH "host"
   CACHE STRING "Set target to use for LLVM JIT or use \"host\" for automatic detection.")
 
-option(LLVM_ENABLE_TERMINFO "Use terminfo database if available." ON)
+option(LLVM_ENABLE_TERMINFO "Use terminfo database if available." OFF)
 
-set(LLVM_ENABLE_LIBXML2 "ON" CACHE STRING "Use libxml2 if available. Can be ON, OFF, or FORCE_ON")
+set(LLVM_ENABLE_LIBXML2 "OFF" CACHE STRING "Use libxml2 if available. Can be ON, OFF, or FORCE_ON")
 
-option(LLVM_ENABLE_LIBEDIT "Use libedit if available." ON)
+option(LLVM_ENABLE_LIBEDIT "Use libedit if available." OFF)
 
-option(LLVM_ENABLE_LIBPFM "Use libpfm for performance counters if available." ON)
+option(LLVM_ENABLE_LIBPFM "Use libpfm for performance counters if available." OFF)
 
 # On z/OS, threads cannot be used because TLS is not supported.
 if (CMAKE_SYSTEM_NAME MATCHES "OS390")
@@ -396,13 +370,13 @@ else()
   option(LLVM_ENABLE_THREADS "Use threads if available." ON)
 endif()
 
-set(LLVM_ENABLE_ZLIB "ON" CACHE STRING "Use zlib for compression/decompression if available. Can be ON, OFF, or FORCE_ON")
+set(LLVM_ENABLE_ZLIB "OFF" CACHE STRING "Use zlib for compression/decompression if available. Can be ON, OFF, or FORCE_ON")
 
 set(LLVM_Z3_INSTALL_DIR "" CACHE STRING "Install directory of the Z3 solver.")
 
 option(LLVM_ENABLE_Z3_SOLVER
   "Enable Support for the Z3 constraint solver in LLVM."
-  ${LLVM_ENABLE_Z3_SOLVER_DEFAULT}
+  OFF
 )
 
 if (LLVM_ENABLE_Z3_SOLVER)
@@ -569,23 +543,23 @@ endif()
 # components which may not strictly be necessary (tools, examples, and tests).
 #
 # This is primarily to support building smaller or faster project files.
-option(LLVM_INCLUDE_TOOLS "Generate build targets for the LLVM tools." ON)
+option(LLVM_INCLUDE_TOOLS "Generate build targets for the LLVM tools." OFF)
 option(LLVM_BUILD_TOOLS
-  "Build the LLVM tools. If OFF, just generate build targets." ON)
+  "Build the LLVM tools. If OFF, just generate build targets." OFF)
 
-option(LLVM_INCLUDE_UTILS "Generate build targets for the LLVM utils." ON)
+option(LLVM_INCLUDE_UTILS "Generate build targets for the LLVM utils." OFF)
 option(LLVM_BUILD_UTILS
-  "Build LLVM utility binaries. If OFF, just generate build targets." ON)
+  "Build LLVM utility binaries. If OFF, just generate build targets." OFF)
 
-option(LLVM_INCLUDE_RUNTIMES "Generate build targets for the LLVM runtimes." ON)
+option(LLVM_INCLUDE_RUNTIMES "Generate build targets for the LLVM runtimes." OFF)
 option(LLVM_BUILD_RUNTIMES
-  "Build the LLVM runtimes. If OFF, just generate build targets." ON)
+  "Build the LLVM runtimes. If OFF, just generate build targets." OFF)
 
 option(LLVM_BUILD_RUNTIME
-  "Build the LLVM runtime libraries." ON)
+  "Build the LLVM runtime libraries." OFF)
 option(LLVM_BUILD_EXAMPLES
   "Build the LLVM example programs. If OFF, just generate build targets." OFF)
-option(LLVM_INCLUDE_EXAMPLES "Generate build targets for the LLVM examples" ON)
+option(LLVM_INCLUDE_EXAMPLES "Generate build targets for the LLVM examples" OFF)
 
 if(LLVM_BUILD_EXAMPLES)
   add_definitions(-DBUILD_EXAMPLES)
@@ -593,19 +567,19 @@ endif(LLVM_BUILD_EXAMPLES)
 
 option(LLVM_BUILD_TESTS
   "Build LLVM unit tests. If OFF, just generate build targets." OFF)
-option(LLVM_INCLUDE_TESTS "Generate build targets for the LLVM unit tests." ON)
-option(LLVM_INCLUDE_GO_TESTS "Include the Go bindings tests in test build targets." ON)
+option(LLVM_INCLUDE_TESTS "Generate build targets for the LLVM unit tests." OFF)
+option(LLVM_INCLUDE_GO_TESTS "Include the Go bindings tests in test build targets." OFF)
 
 option(LLVM_BUILD_BENCHMARKS "Add LLVM benchmark targets to the list of default
 targets. If OFF, benchmarks still could be built using Benchmarks target." OFF)
-option(LLVM_INCLUDE_BENCHMARKS "Generate benchmark targets. If OFF, benchmarks can't be built." ON)
+option(LLVM_INCLUDE_BENCHMARKS "Generate benchmark targets. If OFF, benchmarks can't be built." OFF)
 
 option (LLVM_BUILD_DOCS "Build the llvm documentation." OFF)
-option (LLVM_INCLUDE_DOCS "Generate build targets for llvm documentation." ON)
+option (LLVM_INCLUDE_DOCS "Generate build targets for llvm documentation." OFF)
 option (LLVM_ENABLE_DOXYGEN "Use doxygen to generate llvm API documentation." OFF)
 option (LLVM_ENABLE_SPHINX "Use Sphinx to generate llvm documentation." OFF)
-option (LLVM_ENABLE_OCAMLDOC "Build OCaml bindings documentation." ON)
-option (LLVM_ENABLE_BINDINGS "Build bindings." ON)
+option (LLVM_ENABLE_OCAMLDOC "Build OCaml bindings documentation." OFF)
+option (LLVM_ENABLE_BINDINGS "Build bindings." OFF)
 
 set(LLVM_INSTALL_DOXYGEN_HTML_DIR "share/doc/llvm/doxygen-html"
     CACHE STRING "Doxygen-generated HTML documentation install directory")
