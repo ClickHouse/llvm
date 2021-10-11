@@ -352,12 +352,7 @@ else()
 endif( LLVM_ENABLE_FFI )
 
 # Whether we can use std::is_trivially_copyable to verify llvm::is_trivially_copyable.
-CHECK_CXX_SOURCE_COMPILES("
-#include <type_traits>
-struct T { int val; };
-static_assert(std::is_trivially_copyable<T>::value, \"ok\");
-int main() { return 0;}
-" HAVE_STD_IS_TRIVIALLY_COPYABLE)
+set (HAVE_STD_IS_TRIVIALLY_COPYABLE 1)
 
 
 # Define LLVM_HAS_ATOMICS if gcc or MSVC atomic builtins are supported.

@@ -77,26 +77,6 @@ if( LLVM_ENABLE_ASSERTIONS )
   endif()
 endif()
 
-if(LLVM_ENABLE_EXPENSIVE_CHECKS)
-  add_definitions(-DEXPENSIVE_CHECKS)
-
-  # In some libstdc++ versions, std::min_element is not constexpr when
-  # _GLIBCXX_DEBUG is enabled.
-  CHECK_CXX_SOURCE_COMPILES("
-    #define _GLIBCXX_DEBUG
-    #include <algorithm>
-    int main(int argc, char** argv) {
-      static constexpr int data[] = {0, 1};
-      constexpr const int* min_elt = std::min_element(&data[0], &data[2]);
-      return 0;
-    }" CXX_SUPPORTS_GLIBCXX_DEBUG)
-  if(CXX_SUPPORTS_GLIBCXX_DEBUG)
-    add_definitions(-D_GLIBCXX_DEBUG)
-  else()
-    add_definitions(-D_GLIBCXX_ASSERTIONS)
-  endif()
-endif()
-
 if (LLVM_ENABLE_STRICT_FIXED_SIZE_VECTORS)
   add_definitions(-DSTRICT_FIXED_SIZE_VECTORS)
 endif()
@@ -274,18 +254,6 @@ if( LLVM_ENABLE_LLD )
   endif()
 endif()
 
-if( LLVM_USE_LINKER )
-  set(OLD_CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS})
-  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -fuse-ld=${LLVM_USE_LINKER}")
-  check_cxx_source_compiles("int main() { return 0; }" CXX_SUPPORTS_CUSTOM_LINKER)
-  if ( NOT CXX_SUPPORTS_CUSTOM_LINKER )
-    message(FATAL_ERROR "Host compiler does not support '-fuse-ld=${LLVM_USE_LINKER}'")
-  endif()
-  set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
-  append("-fuse-ld=${LLVM_USE_LINKER}"
-    CMAKE_EXE_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS)
-endif()
-
 if( LLVM_ENABLE_PIC )
   if( XCODE )
     # Xcode has -mdynamic-no-pic on by default, which overrides -fPIC. I don't
@@ -315,7 +283,7 @@ endif()
 if(NOT WIN32 AND NOT CYGWIN AND NOT (${CMAKE_SYSTEM_NAME} MATCHES "AIX" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
   # MinGW warns if -fvisibility-inlines-hidden is used.
   # GCC on AIX warns if -fvisibility-inlines-hidden is used.
-  check_cxx_compiler_flag("-fvisibility-inlines-hidden" SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG)
+  check_c_compiler_flag("-fvisibility-inlines-hidden" SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG)
   append_if(SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG "-fvisibility-inlines-hidden" CMAKE_CXX_FLAGS)
 endif()
 
