@@ -92,7 +92,7 @@ function(tablegen project ofn)
   list(TRANSFORM tblgen_includes PREPEND -I)
 
   add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${ofn}
-    COMMAND ${${project}_TABLEGEN_EXE} ${ARGN} -I ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND $<TARGET_FILE:llvm-tblgen> ${ARGN} -I ${CMAKE_CURRENT_SOURCE_DIR}
     ${tblgen_includes}
     ${LLVM_TABLEGEN_FLAGS}
     ${LLVM_TARGET_DEFINITIONS_ABSOLUTE}
