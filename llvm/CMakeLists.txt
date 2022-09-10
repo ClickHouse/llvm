@@ -18,12 +18,11 @@ if(NOT DEFINED LLVM_VERSION_SUFFIX)
 endif()
 
 # ClickHouse specific options
-
 set (LLVM_ENABLE_PROJECTS "")
-
-add_definitions(
-    -g0             # To lower object size
-)
+if (OMIT_HEAVY_DEBUG_SYMBOLS)
+    # Lower object size
+    add_definitions(-g0)
+endif()
 
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
 # New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
