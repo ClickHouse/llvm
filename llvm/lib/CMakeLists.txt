@@ -35,9 +35,10 @@ add_subdirectory(Passes)
 add_subdirectory(TextAPI)
 add_subdirectory(ToolDrivers)
 add_subdirectory(XRay)
-if (LLVM_INCLUDE_TESTS)
-  add_subdirectory(Testing)
-endif()
+# ROB: LLVM_INCLUDE_TESTS is OFF
+# if (LLVM_INCLUDE_TESTS)
+#   add_subdirectory(Testing)
+# endif()
 add_subdirectory(WindowsManifest)
 
 set(LLVMCONFIGLIBRARYDEPENDENCIESINC "${LLVM_BINARY_DIR}/tools/llvm-config/LibraryDependencies.inc")

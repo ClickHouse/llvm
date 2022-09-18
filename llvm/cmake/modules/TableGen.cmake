@@ -39,19 +39,21 @@ function(tablegen project ofn)
     set(LLVM_TARGET_DEFINITIONS_ABSOLUTE
       ${CMAKE_CURRENT_SOURCE_DIR}/${LLVM_TARGET_DEFINITIONS})
   endif()
-  if (LLVM_ENABLE_DAGISEL_COV)
-    list(FIND ARGN "-gen-dag-isel" idx)
-    if( NOT idx EQUAL -1 )
-      list(APPEND LLVM_TABLEGEN_FLAGS "-instrument-coverage")
-    endif()
-  endif()
-  if (LLVM_ENABLE_GISEL_COV)
-    list(FIND ARGN "-gen-global-isel" idx)
-    if( NOT idx EQUAL -1 )
-      list(APPEND LLVM_TABLEGEN_FLAGS "-instrument-gisel-coverage")
-      list(APPEND LLVM_TABLEGEN_FLAGS "-gisel-coverage-file=${LLVM_GISEL_COV_PREFIX}all")
-    endif()
-  endif()
+  # ROB: LLVM_ENABLE_DAGISEL_COV is OFF
+  # if (LLVM_ENABLE_DAGISEL_COV)
+  #   list(FIND ARGN "-gen-dag-isel" idx)
+  #   if( NOT idx EQUAL -1 )
+  #     list(APPEND LLVM_TABLEGEN_FLAGS "-instrument-coverage")
+  #   endif()
+  # endif()
+  # ROB: LLVM_ENABLE_GISEL_COV is OFF
+  # if (LLVM_ENABLE_GISEL_COV)
+  #   list(FIND ARGN "-gen-global-isel" idx)
+  #   if( NOT idx EQUAL -1 )
+  #     list(APPEND LLVM_TABLEGEN_FLAGS "-instrument-gisel-coverage")
+  #     list(APPEND LLVM_TABLEGEN_FLAGS "-gisel-coverage-file=${LLVM_GISEL_COV_PREFIX}all")
+  #   endif()
+  # endif()
   # Comments are only useful for Debug builds. Omit them if the backend
   # supports it.
   if (NOT (uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" OR
@@ -170,28 +172,31 @@ macro(add_tablegen target project)
 
       # If we're using the host tablegen, and utils were not requested, we have no
       # need to build this tablegen.
-      if ( NOT LLVM_BUILD_UTILS )
+      # ROB: LLVM_BUILD_UTILS is OFF
+      # if ( NOT LLVM_BUILD_UTILS )
         set_target_properties(${target} PROPERTIES EXCLUDE_FROM_ALL ON)
-      endif()
+      # endif()
     endif()
   endif()
 
-  if ((${project} STREQUAL LLVM OR ${project} STREQUAL MLIR) AND NOT LLVM_INSTALL_TOOLCHAIN_ONLY AND LLVM_BUILD_UTILS)
-    set(export_to_llvmexports)
-    if(${target} IN_LIST LLVM_DISTRIBUTION_COMPONENTS OR
-        NOT LLVM_DISTRIBUTION_COMPONENTS)
-      set(export_to_llvmexports EXPORT LLVMExports)
-    endif()
-
-    install(TARGETS ${target}
-            ${export_to_llvmexports}
-            COMPONENT ${target}
-            RUNTIME DESTINATION ${LLVM_TOOLS_INSTALL_DIR})
-    if(NOT LLVM_ENABLE_IDE)
-      add_llvm_install_targets("install-${target}"
-                               DEPENDS ${target}
-                               COMPONENT ${target})
-    endif()
-  endif()
+  # ROB: LLVM_INSTALL_TOOLCHAIN_ONLY is OFF
+  # ROB: LLVM_BUILD_UTILS is OFF
+  # if ((${project} STREQUAL LLVM OR ${project} STREQUAL MLIR) AND NOT LLVM_INSTALL_TOOLCHAIN_ONLY AND LLVM_BUILD_UTILS)
+  #   set(export_to_llvmexports)
+  #   if(${target} IN_LIST LLVM_DISTRIBUTION_COMPONENTS OR
+  #       NOT LLVM_DISTRIBUTION_COMPONENTS)
+  #     set(export_to_llvmexports EXPORT LLVMExports)
+  #   endif()
+  #
+  #   install(TARGETS ${target}
+  #           ${export_to_llvmexports}
+  #           COMPONENT ${target}
+  #           RUNTIME DESTINATION ${LLVM_TOOLS_INSTALL_DIR})
+  #   if(NOT LLVM_ENABLE_IDE)
+  #     add_llvm_install_targets("install-${target}"
+  #                              DEPENDS ${target}
+  #                              COMPONENT ${target})
+  #   endif()
+  # endif()
   set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS ${target})
 endmacro()

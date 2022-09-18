@@ -32,14 +32,17 @@ add_subdirectory(MCJIT)
 add_subdirectory(Orc)
 add_subdirectory(RuntimeDyld)
 
-if( LLVM_USE_OPROFILE )
-  add_subdirectory(OProfileJIT)
-endif( LLVM_USE_OPROFILE )
+# ROB: LLVM_USE_OPROFILE is OFF
+# if( LLVM_USE_OPROFILE )
+#   add_subdirectory(OProfileJIT)
+# endif( LLVM_USE_OPROFILE )
 
-if( LLVM_USE_INTEL_JITEVENTS )
-  add_subdirectory(IntelJITEvents)
-endif( LLVM_USE_INTEL_JITEVENTS )
+# ROB: LLVM_USE_INTEL_JITEVENTS is OFF
+# if( LLVM_USE_INTEL_JITEVENTS )
+#   add_subdirectory(IntelJITEvents)
+# endif( LLVM_USE_INTEL_JITEVENTS )
 
-if( LLVM_USE_PERF )
-  add_subdirectory(PerfJITEvents)
-endif( LLVM_USE_PERF )
+# ROB: LLVM_USE_PERF is OFF
+# if( LLVM_USE_PERF )
+#   add_subdirectory(PerfJITEvents)
+# endif( LLVM_USE_PERF )

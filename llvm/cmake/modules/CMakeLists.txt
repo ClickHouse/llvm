@@ -58,18 +58,20 @@ set(LLVM_CONFIG_BINARY_DIR "${LLVM_BINARY_DIR}")
 set(LLVM_CONFIG_TOOLS_BINARY_DIR "${LLVM_TOOLS_BINARY_DIR}")
 
 # Generate a default location for lit
-if (LLVM_BUILD_UTILS)
-  if (CMAKE_HOST_WIN32 AND NOT CYGWIN)
-    set(LLVM_CONFIG_DEFAULT_EXTERNAL_LIT "${LLVM_CONFIG_TOOLS_BINARY_DIR}/llvm-lit.py")
-  else()
-    set(LLVM_CONFIG_DEFAULT_EXTERNAL_LIT "${LLVM_CONFIG_TOOLS_BINARY_DIR}/llvm-lit")
-  endif()
-endif()
+# ROB: LLVM_BUILD_UTILS is OFF
+# if (LLVM_BUILD_UTILS)
+#   if (CMAKE_HOST_WIN32 AND NOT CYGWIN)
+#     set(LLVM_CONFIG_DEFAULT_EXTERNAL_LIT "${LLVM_CONFIG_TOOLS_BINARY_DIR}/llvm-lit.py")
+#   else()
+#     set(LLVM_CONFIG_DEFAULT_EXTERNAL_LIT "${LLVM_CONFIG_TOOLS_BINARY_DIR}/llvm-lit")
+#   endif()
+# endif()
 
-if (LLVM_LINK_LLVM_DYLIB)
-  set(LLVM_CONFIG_LINK_LLVM_DYLIB
-      "set(LLVM_LINK_LLVM_DYLIB ${LLVM_LINK_LLVM_DYLIB})")
-endif()
+# ROB: LLVM_LINK_LLVM_DYLIB is OFF
+# if (LLVM_LINK_LLVM_DYLIB)
+#   set(LLVM_CONFIG_LINK_LLVM_DYLIB
+#       "set(LLVM_LINK_LLVM_DYLIB ${LLVM_LINK_LLVM_DYLIB})")
+# endif()
 
 # We need to use the full path to the LLVM Exports file to make sure we get the
 # one from the build tree. This is due to our cmake files being split between
@@ -116,9 +118,10 @@ set(LLVM_CONFIG_BINARY_DIR "\${LLVM_INSTALL_PREFIX}")
 set(LLVM_CONFIG_TOOLS_BINARY_DIR "\${LLVM_INSTALL_PREFIX}/bin")
 
 # Generate a default location for lit
-if (LLVM_INSTALL_UTILS AND LLVM_BUILD_UTILS)
-  set(LLVM_CONFIG_DEFAULT_EXTERNAL_LIT "${LLVM_CONFIG_TOOLS_BINARY_DIR}/llvm-lit")
-endif()
+# ROB: LLVM_INSTALL_UTILS is OFF
+# if (LLVM_INSTALL_UTILS AND LLVM_BUILD_UTILS)
+#   set(LLVM_CONFIG_DEFAULT_EXTERNAL_LIT "${LLVM_CONFIG_TOOLS_BINARY_DIR}/llvm-lit")
+# endif()
 
 set(LLVM_CONFIG_EXPORTS_FILE "\${LLVM_CMAKE_DIR}/LLVMExports.cmake")
 set(LLVM_CONFIG_EXPORTS "${LLVM_EXPORTS}")
@@ -133,7 +136,8 @@ configure_file(
   ${llvm_cmake_builddir}/LLVMConfigVersion.cmake
   @ONLY)
 
-if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
+# ROB: LLVM_INSTALL_TOOLCHAIN_ONLY is OFF
+# if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
   get_property(llvm_has_exports GLOBAL PROPERTY LLVM_HAS_EXPORTS)
   if(llvm_has_exports)
     install(EXPORT LLVMExports DESTINATION ${LLVM_INSTALL_PACKAGE_DIR}
@@ -163,4 +167,4 @@ if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     add_llvm_install_targets(install-cmake-exports
                              COMPONENT cmake-exports)
   endif()
-endif()
+# endif()

@@ -1,7 +1,7 @@
-if( WIN32 AND NOT CYGWIN )
-  # We consider Cygwin as another Unix
-  set(PURE_WINDOWS 1)
-endif()
+# if( WIN32 AND NOT CYGWIN )
+#   # We consider Cygwin as another Unix
+#   set(PURE_WINDOWS 1)
+# endif()
 
 include(CheckIncludeFile)
 include(CheckLibraryExists)
@@ -116,47 +116,49 @@ if(HAVE_LIBPTHREAD)
   set(LLVM_PTHREAD_LIB ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
-if(LLVM_ENABLE_ZLIB)
-  if(LLVM_ENABLE_ZLIB STREQUAL FORCE_ON)
-    find_package(ZLIB REQUIRED)
-  elseif(NOT LLVM_USE_SANITIZER MATCHES "Memory.*")
-    find_package(ZLIB)
-  endif()
-  if(ZLIB_FOUND)
-    # Check if zlib we found is usable; for example, we may have found a 32-bit
-    # library on a 64-bit system which would result in a link-time failure.
-    cmake_push_check_state()
-    list(APPEND CMAKE_REQUIRED_INCLUDES ${ZLIB_INCLUDE_DIRS})
-    list(APPEND CMAKE_REQUIRED_LIBRARIES ${ZLIB_LIBRARY})
-    check_symbol_exists(compress2 zlib.h HAVE_ZLIB)
-    cmake_pop_check_state()
-    if(LLVM_ENABLE_ZLIB STREQUAL FORCE_ON AND NOT HAVE_ZLIB)
-      message(FATAL_ERROR "Failed to configure zlib")
-    endif()
-  endif()
-  set(LLVM_ENABLE_ZLIB "${HAVE_ZLIB}")
-endif()
+# ROB: LLVM_ENABLE_ZLIB is OFF
+# if(LLVM_ENABLE_ZLIB)
+#   if(LLVM_ENABLE_ZLIB STREQUAL FORCE_ON)
+#     find_package(ZLIB REQUIRED)
+#   elseif(NOT LLVM_USE_SANITIZER MATCHES "Memory.*")
+#     find_package(ZLIB)
+#   endif()
+#   if(ZLIB_FOUND)
+#     # Check if zlib we found is usable; for example, we may have found a 32-bit
+#     # library on a 64-bit system which would result in a link-time failure.
+#     cmake_push_check_state()
+#     list(APPEND CMAKE_REQUIRED_INCLUDES ${ZLIB_INCLUDE_DIRS})
+#     list(APPEND CMAKE_REQUIRED_LIBRARIES ${ZLIB_LIBRARY})
+#     check_symbol_exists(compress2 zlib.h HAVE_ZLIB)
+#     cmake_pop_check_state()
+#     if(LLVM_ENABLE_ZLIB STREQUAL FORCE_ON AND NOT HAVE_ZLIB)
+#       message(FATAL_ERROR "Failed to configure zlib")
+#     endif()
+#   endif()
+#   set(LLVM_ENABLE_ZLIB "${HAVE_ZLIB}")
+# endif()
 
-if(LLVM_ENABLE_LIBXML2)
-  if(LLVM_ENABLE_LIBXML2 STREQUAL FORCE_ON)
-    find_package(LibXml2 REQUIRED)
-  elseif(NOT LLVM_USE_SANITIZER MATCHES "Memory.*")
-    find_package(LibXml2)
-  endif()
-  if(LibXml2_FOUND)
-    # Check if libxml2 we found is usable; for example, we may have found a 32-bit
-    # library on a 64-bit system which would result in a link-time failure.
-    cmake_push_check_state()
-    list(APPEND CMAKE_REQUIRED_INCLUDES ${LIBXML2_INCLUDE_DIRS})
-    list(APPEND CMAKE_REQUIRED_LIBRARIES ${LIBXML2_LIBRARIES})
-    check_symbol_exists(xmlReadMemory libxml/xmlreader.h HAVE_LIBXML2)
-    cmake_pop_check_state()
-    if(LLVM_ENABLE_LIBXML2 STREQUAL FORCE_ON AND NOT HAVE_LIBXML2)
-      message(FATAL_ERROR "Failed to configure libxml2")
-    endif()
-  endif()
-  set(LLVM_ENABLE_LIBXML2 "${HAVE_LIBXML2}")
-endif()
+# ROB: LLVM_ENABLE_LIBXML2 is OFF
+# if(LLVM_ENABLE_LIBXML2)
+#   if(LLVM_ENABLE_LIBXML2 STREQUAL FORCE_ON)
+#     find_package(LibXml2 REQUIRED)
+#   elseif(NOT LLVM_USE_SANITIZER MATCHES "Memory.*")
+#     find_package(LibXml2)
+#   endif()
+#   if(LibXml2_FOUND)
+#     # Check if libxml2 we found is usable; for example, we may have found a 32-bit
+#     # library on a 64-bit system which would result in a link-time failure.
+#     cmake_push_check_state()
+#     list(APPEND CMAKE_REQUIRED_INCLUDES ${LIBXML2_INCLUDE_DIRS})
+#     list(APPEND CMAKE_REQUIRED_LIBRARIES ${LIBXML2_LIBRARIES})
+#     check_symbol_exists(xmlReadMemory libxml/xmlreader.h HAVE_LIBXML2)
+#     cmake_pop_check_state()
+#     if(LLVM_ENABLE_LIBXML2 STREQUAL FORCE_ON AND NOT HAVE_LIBXML2)
+#       message(FATAL_ERROR "Failed to configure libxml2")
+#     endif()
+#   endif()
+#   set(LLVM_ENABLE_LIBXML2 "${HAVE_LIBXML2}")
+# endif()
 
 # Don't look for these libraries if we're using MSan, since uninstrumented third
 # party code may call MSan interceptors like strlen, leading to false positives.
@@ -164,24 +166,28 @@ if(NOT LLVM_USE_SANITIZER MATCHES "Memory.*")
   # Don't look for these libraries on Windows.
   if (NOT PURE_WINDOWS)
     # Skip libedit if using ASan as it contains memory leaks.
-    if (LLVM_ENABLE_LIBEDIT AND HAVE_HISTEDIT_H AND NOT LLVM_USE_SANITIZER MATCHES ".*Address.*")
-      check_library_exists(edit el_init "" HAVE_LIBEDIT)
-    else()
+    # ROB: LLVM_ENABLE_LIBEDIT is OFF
+    # if (LLVM_ENABLE_LIBEDIT AND HAVE_HISTEDIT_H AND NOT LLVM_USE_SANITIZER MATCHES ".*Address.*")
+    #   check_library_exists(edit el_init "" HAVE_LIBEDIT)
+    # else()
       set(HAVE_LIBEDIT 0)
-    endif()
-    if(LLVM_ENABLE_TERMINFO STREQUAL FORCE_ON)
-      set(MAYBE_REQUIRED REQUIRED)
-    else()
+    # endif()
+    # ROB: LLVM_ENABLE_TERMINFO is OFF
+    # if(LLVM_ENABLE_TERMINFO STREQUAL FORCE_ON)
+    #   set(MAYBE_REQUIRED REQUIRED)
+    # else()
       set(MAYBE_REQUIRED)
-    endif()
-    if(LLVM_ENABLE_TERMINFO)
-      find_library(TERMINFO_LIB NAMES terminfo tinfo curses ncurses ncursesw ${MAYBE_REQUIRED})
-    endif()
-    if(TERMINFO_LIB)
-      set(LLVM_ENABLE_TERMINFO 1)
-    else()
+    # endif()
+    # ROB: LLVM_ENABLE_TERMINFO is OFF
+    # if(LLVM_ENABLE_TERMINFO)
+    #   find_library(TERMINFO_LIB NAMES terminfo tinfo curses ncurses ncursesw ${MAYBE_REQUIRED})
+    # endif()
+    # ROB: LLVM_ENABLE_TERMINFO is OFF
+    # if(TERMINFO_LIB)
+    #   set(LLVM_ENABLE_TERMINFO 1)
+    # else()
       set(LLVM_ENABLE_TERMINFO 0)
-    endif()
+    # endif()
   else()
     set(LLVM_ENABLE_TERMINFO 0)
   endif()
@@ -242,30 +248,30 @@ check_symbol_exists(strerror string.h HAVE_STRERROR)
 check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
 check_symbol_exists(strerror_s string.h HAVE_DECL_STRERROR_S)
 check_symbol_exists(setenv stdlib.h HAVE_SETENV)
-if( PURE_WINDOWS )
-  check_symbol_exists(_chsize_s io.h HAVE__CHSIZE_S)
-
-  check_function_exists(_alloca HAVE__ALLOCA)
-  check_function_exists(__alloca HAVE___ALLOCA)
-  check_function_exists(__chkstk HAVE___CHKSTK)
-  check_function_exists(__chkstk_ms HAVE___CHKSTK_MS)
-  check_function_exists(___chkstk HAVE____CHKSTK)
-  check_function_exists(___chkstk_ms HAVE____CHKSTK_MS)
-
-  check_function_exists(__ashldi3 HAVE___ASHLDI3)
-  check_function_exists(__ashrdi3 HAVE___ASHRDI3)
-  check_function_exists(__divdi3 HAVE___DIVDI3)
-  check_function_exists(__fixdfdi HAVE___FIXDFDI)
-  check_function_exists(__fixsfdi HAVE___FIXSFDI)
-  check_function_exists(__floatdidf HAVE___FLOATDIDF)
-  check_function_exists(__lshrdi3 HAVE___LSHRDI3)
-  check_function_exists(__moddi3 HAVE___MODDI3)
-  check_function_exists(__udivdi3 HAVE___UDIVDI3)
-  check_function_exists(__umoddi3 HAVE___UMODDI3)
-
-  check_function_exists(__main HAVE___MAIN)
-  check_function_exists(__cmpdi2 HAVE___CMPDI2)
-endif()
+# if( PURE_WINDOWS )
+#   check_symbol_exists(_chsize_s io.h HAVE__CHSIZE_S)
+#
+#   check_function_exists(_alloca HAVE__ALLOCA)
+#   check_function_exists(__alloca HAVE___ALLOCA)
+#   check_function_exists(__chkstk HAVE___CHKSTK)
+#   check_function_exists(__chkstk_ms HAVE___CHKSTK_MS)
+#   check_function_exists(___chkstk HAVE____CHKSTK)
+#   check_function_exists(___chkstk_ms HAVE____CHKSTK_MS)
+#
+#   check_function_exists(__ashldi3 HAVE___ASHLDI3)
+#   check_function_exists(__ashrdi3 HAVE___ASHRDI3)
+#   check_function_exists(__divdi3 HAVE___DIVDI3)
+#   check_function_exists(__fixdfdi HAVE___FIXDFDI)
+#   check_function_exists(__fixsfdi HAVE___FIXSFDI)
+#   check_function_exists(__floatdidf HAVE___FLOATDIDF)
+#   check_function_exists(__lshrdi3 HAVE___LSHRDI3)
+#   check_function_exists(__moddi3 HAVE___MODDI3)
+#   check_function_exists(__udivdi3 HAVE___UDIVDI3)
+#   check_function_exists(__umoddi3 HAVE___UMODDI3)
+#
+#   check_function_exists(__main HAVE___MAIN)
+#   check_function_exists(__cmpdi2 HAVE___CMPDI2)
+# endif()
 if( HAVE_DLFCN_H )
   if( HAVE_LIBDL )
     list(APPEND CMAKE_REQUIRED_LIBRARIES dl)
@@ -300,56 +306,58 @@ if (NOT PURE_WINDOWS)
 endif()
 
 # available programs checks
-function(llvm_find_program name)
-  string(TOUPPER ${name} NAME)
-  string(REGEX REPLACE "\\." "_" NAME ${NAME})
+# function(llvm_find_program name)
+#   string(TOUPPER ${name} NAME)
+#   string(REGEX REPLACE "\\." "_" NAME ${NAME})
+#
+#   find_program(LLVM_PATH_${NAME} NAMES ${ARGV})
+#   mark_as_advanced(LLVM_PATH_${NAME})
+#   if(LLVM_PATH_${NAME})
+#     set(HAVE_${NAME} 1 CACHE INTERNAL "Is ${name} available ?")
+#     mark_as_advanced(HAVE_${NAME})
+#   else(LLVM_PATH_${NAME})
+#     set(HAVE_${NAME} "" CACHE INTERNAL "Is ${name} available ?")
+#   endif(LLVM_PATH_${NAME})
+# endfunction()
 
-  find_program(LLVM_PATH_${NAME} NAMES ${ARGV})
-  mark_as_advanced(LLVM_PATH_${NAME})
-  if(LLVM_PATH_${NAME})
-    set(HAVE_${NAME} 1 CACHE INTERNAL "Is ${name} available ?")
-    mark_as_advanced(HAVE_${NAME})
-  else(LLVM_PATH_${NAME})
-    set(HAVE_${NAME} "" CACHE INTERNAL "Is ${name} available ?")
-  endif(LLVM_PATH_${NAME})
-endfunction()
+# ROB: LLVM_ENABLE_DOXYGEN is OFF
+# if (LLVM_ENABLE_DOXYGEN)
+#   llvm_find_program(dot)
+# endif ()
 
-if (LLVM_ENABLE_DOXYGEN)
-  llvm_find_program(dot)
-endif ()
-
-if( LLVM_ENABLE_FFI )
-  find_path(FFI_INCLUDE_PATH ffi.h PATHS ${FFI_INCLUDE_DIR})
-  if( EXISTS "${FFI_INCLUDE_PATH}/ffi.h" )
-    set(FFI_HEADER ffi.h CACHE INTERNAL "")
-    set(HAVE_FFI_H 1 CACHE INTERNAL "")
-  else()
-    find_path(FFI_INCLUDE_PATH ffi/ffi.h PATHS ${FFI_INCLUDE_DIR})
-    if( EXISTS "${FFI_INCLUDE_PATH}/ffi/ffi.h" )
-      set(FFI_HEADER ffi/ffi.h CACHE INTERNAL "")
-      set(HAVE_FFI_FFI_H 1 CACHE INTERNAL "")
-    endif()
-  endif()
-
-  if( NOT FFI_HEADER )
-    message(FATAL_ERROR "libffi includes are not found.")
-  endif()
-
-  find_library(FFI_LIBRARY_PATH ffi PATHS ${FFI_LIBRARY_DIR})
-  if( NOT FFI_LIBRARY_PATH )
-    message(FATAL_ERROR "libffi is not found.")
-  endif()
-
-  list(APPEND CMAKE_REQUIRED_LIBRARIES ${FFI_LIBRARY_PATH})
-  list(APPEND CMAKE_REQUIRED_INCLUDES ${FFI_INCLUDE_PATH})
-  check_symbol_exists(ffi_call ${FFI_HEADER} HAVE_FFI_CALL)
-  list(REMOVE_ITEM CMAKE_REQUIRED_INCLUDES ${FFI_INCLUDE_PATH})
-  list(REMOVE_ITEM CMAKE_REQUIRED_LIBRARIES ${FFI_LIBRARY_PATH})
-else()
+# ROB: LLVM_ENABLE_FFI is OFF
+# if( LLVM_ENABLE_FFI )
+#   find_path(FFI_INCLUDE_PATH ffi.h PATHS ${FFI_INCLUDE_DIR})
+#   if( EXISTS "${FFI_INCLUDE_PATH}/ffi.h" )
+#     set(FFI_HEADER ffi.h CACHE INTERNAL "")
+#     set(HAVE_FFI_H 1 CACHE INTERNAL "")
+#   else()
+#     find_path(FFI_INCLUDE_PATH ffi/ffi.h PATHS ${FFI_INCLUDE_DIR})
+#     if( EXISTS "${FFI_INCLUDE_PATH}/ffi/ffi.h" )
+#       set(FFI_HEADER ffi/ffi.h CACHE INTERNAL "")
+#       set(HAVE_FFI_FFI_H 1 CACHE INTERNAL "")
+#     endif()
+#   endif()
+#
+#   if( NOT FFI_HEADER )
+#     message(FATAL_ERROR "libffi includes are not found.")
+#   endif()
+#
+#   find_library(FFI_LIBRARY_PATH ffi PATHS ${FFI_LIBRARY_DIR})
+#   if( NOT FFI_LIBRARY_PATH )
+#     message(FATAL_ERROR "libffi is not found.")
+#   endif()
+#
+#   list(APPEND CMAKE_REQUIRED_LIBRARIES ${FFI_LIBRARY_PATH})
+#   list(APPEND CMAKE_REQUIRED_INCLUDES ${FFI_INCLUDE_PATH})
+#   check_symbol_exists(ffi_call ${FFI_HEADER} HAVE_FFI_CALL)
+#   list(REMOVE_ITEM CMAKE_REQUIRED_INCLUDES ${FFI_INCLUDE_PATH})
+#   list(REMOVE_ITEM CMAKE_REQUIRED_LIBRARIES ${FFI_LIBRARY_PATH})
+# else()
   unset(HAVE_FFI_FFI_H CACHE)
   unset(HAVE_FFI_H CACHE)
   unset(HAVE_FFI_CALL CACHE)
-endif( LLVM_ENABLE_FFI )
+# endif( LLVM_ENABLE_FFI )
 
 # Whether we can use std::is_trivially_copyable to verify llvm::is_trivially_copyable.
 set (HAVE_STD_IS_TRIVIALLY_COPYABLE 1)
@@ -358,37 +366,38 @@ set (HAVE_STD_IS_TRIVIALLY_COPYABLE 1)
 # Define LLVM_HAS_ATOMICS if gcc or MSVC atomic builtins are supported.
 include(CheckAtomic)
 
-if( LLVM_ENABLE_PIC )
-  set(ENABLE_PIC 1)
-else()
+# ROB: LLVM_ENABLE_PIC is OFF
+# if( LLVM_ENABLE_PIC )
+#   set(ENABLE_PIC 1)
+# else()
   set(ENABLE_PIC 0)
   check_cxx_compiler_flag("-fno-pie" SUPPORTS_NO_PIE_FLAG)
   if(SUPPORTS_NO_PIE_FLAG)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fno-pie")
   endif()
-endif()
+# endif()
 
-check_cxx_compiler_flag("-Wvariadic-macros" SUPPORTS_VARIADIC_MACROS_FLAG)
-check_cxx_compiler_flag("-Wgnu-zero-variadic-macro-arguments"
-                        SUPPORTS_GNU_ZERO_VARIADIC_MACRO_ARGUMENTS_FLAG)
+# check_cxx_compiler_flag("-Wvariadic-macros" SUPPORTS_VARIADIC_MACROS_FLAG)
+# check_cxx_compiler_flag("-Wgnu-zero-variadic-macro-arguments"
+#                         SUPPORTS_GNU_ZERO_VARIADIC_MACRO_ARGUMENTS_FLAG)
 
-set(USE_NO_MAYBE_UNINITIALIZED 0)
-set(USE_NO_UNINITIALIZED 0)
+# set(USE_NO_MAYBE_UNINITIALIZED 0)
+# set(USE_NO_UNINITIALIZED 0)
 
 # Disable gcc's potentially uninitialized use analysis as it presents lots of
 # false positives.
-if (CMAKE_COMPILER_IS_GNUCXX)
-  check_cxx_compiler_flag("-Wmaybe-uninitialized" HAS_MAYBE_UNINITIALIZED)
-  if (HAS_MAYBE_UNINITIALIZED)
-    set(USE_NO_MAYBE_UNINITIALIZED 1)
-  else()
-    # Only recent versions of gcc make the distinction between -Wuninitialized
-    # and -Wmaybe-uninitialized. If -Wmaybe-uninitialized isn't supported, just
-    # turn off all uninitialized use warnings.
-    check_cxx_compiler_flag("-Wuninitialized" HAS_UNINITIALIZED)
-    set(USE_NO_UNINITIALIZED ${HAS_UNINITIALIZED})
-  endif()
-endif()
+# if (CMAKE_COMPILER_IS_GNUCXX)
+#   check_cxx_compiler_flag("-Wmaybe-uninitialized" HAS_MAYBE_UNINITIALIZED)
+#   if (HAS_MAYBE_UNINITIALIZED)
+#     set(USE_NO_MAYBE_UNINITIALIZED 1)
+#   else()
+#     # Only recent versions of gcc make the distinction between -Wuninitialized
+#     # and -Wmaybe-uninitialized. If -Wmaybe-uninitialized isn't supported, just
+#     # turn off all uninitialized use warnings.
+#     check_cxx_compiler_flag("-Wuninitialized" HAS_UNINITIALIZED)
+#     set(USE_NO_UNINITIALIZED ${HAS_UNINITIALIZED})
+#   endif()
+# endif()
 
 # By default, we target the host, but this can be overridden at CMake
 # invocation time.
@@ -478,37 +487,37 @@ else ()
   endif ()
 endif ()
 
-if( MSVC )
-  set(SHLIBEXT ".lib")
-  set(stricmp "_stricmp")
-  set(strdup "_strdup")
-
-  # See if the DIA SDK is available and usable.
-  set(MSVC_DIA_SDK_DIR "$ENV{VSINSTALLDIR}DIA SDK" CACHE PATH
-      "Path to the DIA SDK")
-
-  # Due to a bug in MSVC 2013's installation software, it is possible
-  # for MSVC 2013 to write the DIA SDK into the Visual Studio 2012
-  # install directory.  If this happens, the installation is corrupt
-  # and there's nothing we can do.  It happens with enough frequency
-  # though that we should handle it.  We do so by simply checking that
-  # the DIA SDK folder exists.  Should this happen you will need to
-  # uninstall VS 2012 and then re-install VS 2013.
-  if (IS_DIRECTORY "${MSVC_DIA_SDK_DIR}")
-    set(HAVE_DIA_SDK 1)
-  else()
-    set(HAVE_DIA_SDK 0)
-  endif()
-
-  option(LLVM_ENABLE_DIA_SDK "Use MSVC DIA SDK for debugging if available."
-                             ${HAVE_DIA_SDK})
-
-  if(LLVM_ENABLE_DIA_SDK AND NOT HAVE_DIA_SDK)
-    message(FATAL_ERROR "DIA SDK not found. If you have both VS 2012 and 2013 installed, you may need to uninstall the former and re-install the latter afterwards.")
-  endif()
-else()
-  set(LLVM_ENABLE_DIA_SDK 0)
-endif( MSVC )
+# if( MSVC )
+#   set(SHLIBEXT ".lib")
+#   set(stricmp "_stricmp")
+#   set(strdup "_strdup")
+#
+#   # See if the DIA SDK is available and usable.
+#   set(MSVC_DIA_SDK_DIR "$ENV{VSINSTALLDIR}DIA SDK" CACHE PATH
+#       "Path to the DIA SDK")
+#
+#   # Due to a bug in MSVC 2013's installation software, it is possible
+#   # for MSVC 2013 to write the DIA SDK into the Visual Studio 2012
+#   # install directory.  If this happens, the installation is corrupt
+#   # and there's nothing we can do.  It happens with enough frequency
+#   # though that we should handle it.  We do so by simply checking that
+#   # the DIA SDK folder exists.  Should this happen you will need to
+#   # uninstall VS 2012 and then re-install VS 2013.
+#   if (IS_DIRECTORY "${MSVC_DIA_SDK_DIR}")
+#     set(HAVE_DIA_SDK 1)
+#   else()
+#     set(HAVE_DIA_SDK 0)
+#   endif()
+#
+#   option(LLVM_ENABLE_DIA_SDK "Use MSVC DIA SDK for debugging if available."
+#                              ${HAVE_DIA_SDK})
+#
+#   if(LLVM_ENABLE_DIA_SDK AND NOT HAVE_DIA_SDK)
+#     message(FATAL_ERROR "DIA SDK not found. If you have both VS 2012 and 2013 installed, you may need to uninstall the former and re-install the latter afterwards.")
+#   endif()
+# else()
+#   set(LLVM_ENABLE_DIA_SDK 0)
+# endif( MSVC )
 
 # FIXME: Signal handler return type, currently hardcoded to 'void'
 set(RETSIGTYPE void)
@@ -526,46 +535,49 @@ else( LLVM_ENABLE_THREADS )
   message(STATUS "Threads disabled.")
 endif()
 
-if (LLVM_ENABLE_DOXYGEN)
-  message(STATUS "Doxygen enabled.")
-  find_package(Doxygen REQUIRED)
+# ROB: LLVM_ENABLE_DOXYGEN is OFF
+# if (LLVM_ENABLE_DOXYGEN)
+#   message(STATUS "Doxygen enabled.")
+#   find_package(Doxygen REQUIRED)
+#
+#   if (DOXYGEN_FOUND)
+#     # If we find doxygen and we want to enable doxygen by default create a
+#     # global aggregate doxygen target for generating llvm and any/all
+#     # subprojects doxygen documentation.
+#     # if (LLVM_BUILD_DOCS)
+#     #   # ROB: LLVM_BUILD_DOCS is off
+#     #   add_custom_target(doxygen ALL)
+#     # endif()
+#
+#     option(LLVM_DOXYGEN_EXTERNAL_SEARCH "Enable doxygen external search." OFF)
+#     if (LLVM_DOXYGEN_EXTERNAL_SEARCH)
+#       set(LLVM_DOXYGEN_SEARCHENGINE_URL "" CACHE STRING "URL to use for external search.")
+#       set(LLVM_DOXYGEN_SEARCH_MAPPINGS "" CACHE STRING "Doxygen Search Mappings")
+#     endif()
+#   endif()
+# else()
+  # message(STATUS "Doxygen disabled.")
+# endif()
 
-  if (DOXYGEN_FOUND)
-    # If we find doxygen and we want to enable doxygen by default create a
-    # global aggregate doxygen target for generating llvm and any/all
-    # subprojects doxygen documentation.
-    if (LLVM_BUILD_DOCS)
-      add_custom_target(doxygen ALL)
-    endif()
-
-    option(LLVM_DOXYGEN_EXTERNAL_SEARCH "Enable doxygen external search." OFF)
-    if (LLVM_DOXYGEN_EXTERNAL_SEARCH)
-      set(LLVM_DOXYGEN_SEARCHENGINE_URL "" CACHE STRING "URL to use for external search.")
-      set(LLVM_DOXYGEN_SEARCH_MAPPINGS "" CACHE STRING "Doxygen Search Mappings")
-    endif()
-  endif()
-else()
-  message(STATUS "Doxygen disabled.")
-endif()
-
-set(LLVM_BINDINGS "")
-find_program(GO_EXECUTABLE NAMES go DOC "go executable")
-if(WIN32 OR NOT LLVM_ENABLE_BINDINGS)
-  message(STATUS "Go bindings disabled.")
-else()
-  if(GO_EXECUTABLE STREQUAL "GO_EXECUTABLE-NOTFOUND")
-    message(STATUS "Go bindings disabled.")
-  else()
-    execute_process(COMMAND ${GO_EXECUTABLE} run ${PROJECT_SOURCE_DIR}/bindings/go/conftest.go
-                    RESULT_VARIABLE GO_CONFTEST)
-    if(GO_CONFTEST STREQUAL "0")
-      set(LLVM_BINDINGS "${LLVM_BINDINGS} go")
-      message(STATUS "Go bindings enabled.")
-    else()
-      message(STATUS "Go bindings disabled, need at least Go 1.2.")
-    endif()
-  endif()
-endif()
+# set(LLVM_BINDINGS "")
+# find_program(GO_EXECUTABLE NAMES go DOC "go executable")
+# ROB: LLVM_ENABLE_BINDINGS is false
+# if(WIN32 OR NOT LLVM_ENABLE_BINDINGS)
+  # message(STATUS "Go bindings disabled.")
+# else()
+#   if(GO_EXECUTABLE STREQUAL "GO_EXECUTABLE-NOTFOUND")
+#     message(STATUS "Go bindings disabled.")
+#   else()
+#     execute_process(COMMAND ${GO_EXECUTABLE} run ${PROJECT_SOURCE_DIR}/bindings/go/conftest.go
+#                     RESULT_VARIABLE GO_CONFTEST)
+#     if(GO_CONFTEST STREQUAL "0")
+#       set(LLVM_BINDINGS "${LLVM_BINDINGS} go")
+#       message(STATUS "Go bindings enabled.")
+#     else()
+#       message(STATUS "Go bindings disabled, need at least Go 1.2.")
+#     endif()
+#   endif()
+# endif()
 
 find_program(GOLD_EXECUTABLE NAMES ${LLVM_DEFAULT_TARGET_TRIPLE}-ld.gold ld.gold ${LLVM_DEFAULT_TARGET_TRIPLE}-ld ld DOC "The gold linker")
 set(LLVM_BINUTILS_INCDIR "" CACHE PATH
@@ -585,88 +597,89 @@ if(CMAKE_GENERATOR STREQUAL "Ninja" AND
   set(LLVM_TOUCH_STATIC_LIBRARIES ON)
 endif()
 
-if(CMAKE_HOST_APPLE AND APPLE)
-  if(NOT CMAKE_XCRUN)
-    find_program(CMAKE_XCRUN NAMES xcrun)
-  endif()
-  if(CMAKE_XCRUN)
-    execute_process(COMMAND ${CMAKE_XCRUN} -find ld
-      OUTPUT_VARIABLE LD64_EXECUTABLE
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  else()
-    find_program(LD64_EXECUTABLE NAMES ld DOC "The ld64 linker")
-  endif()
-
-  if(LD64_EXECUTABLE)
-    set(LD64_EXECUTABLE ${LD64_EXECUTABLE} CACHE PATH "ld64 executable")
-    message(STATUS "Found ld64 - ${LD64_EXECUTABLE}")
-  endif()
-endif()
+# if(CMAKE_HOST_APPLE AND APPLE)
+#   if(NOT CMAKE_XCRUN)
+#     find_program(CMAKE_XCRUN NAMES xcrun)
+#   endif()
+#   if(CMAKE_XCRUN)
+#     execute_process(COMMAND ${CMAKE_XCRUN} -find ld
+#       OUTPUT_VARIABLE LD64_EXECUTABLE
+#       OUTPUT_STRIP_TRAILING_WHITESPACE)
+#   else()
+#     find_program(LD64_EXECUTABLE NAMES ld DOC "The ld64 linker")
+#   endif()
+#
+#   if(LD64_EXECUTABLE)
+#     set(LD64_EXECUTABLE ${LD64_EXECUTABLE} CACHE PATH "ld64 executable")
+#     message(STATUS "Found ld64 - ${LD64_EXECUTABLE}")
+#   endif()
+# endif()
 
 # Keep the version requirements in sync with bindings/ocaml/README.txt.
-include(FindOCaml)
-include(AddOCaml)
-if(WIN32 OR NOT LLVM_ENABLE_BINDINGS)
-  message(STATUS "OCaml bindings disabled.")
-else()
-  find_package(OCaml)
-  if( NOT OCAML_FOUND )
-    message(STATUS "OCaml bindings disabled.")
-  else()
-    if( OCAML_VERSION VERSION_LESS "4.00.0" )
-      message(STATUS "OCaml bindings disabled, need OCaml >=4.00.0.")
-    else()
-      find_ocamlfind_package(ctypes VERSION 0.4 OPTIONAL)
-      if( HAVE_OCAML_CTYPES )
-        message(STATUS "OCaml bindings enabled.")
-        find_ocamlfind_package(oUnit VERSION 2 OPTIONAL)
-        set(LLVM_BINDINGS "${LLVM_BINDINGS} ocaml")
+# include(FindOCaml)
+# include(AddOCaml)
+# ROB: LLVM_ENABLE_BINDINGS is OFF
+# if(WIN32 OR NOT LLVM_ENABLE_BINDINGS)
+  # message(STATUS "OCaml bindings disabled.")
+# else()
+#   find_package(OCaml)
+#   if( NOT OCAML_FOUND )
+#     message(STATUS "OCaml bindings disabled.")
+#   else()
+#     if( OCAML_VERSION VERSION_LESS "4.00.0" )
+#       message(STATUS "OCaml bindings disabled, need OCaml >=4.00.0.")
+#     else()
+#       find_ocamlfind_package(ctypes VERSION 0.4 OPTIONAL)
+#       if( HAVE_OCAML_CTYPES )
+#         message(STATUS "OCaml bindings enabled.")
+#         find_ocamlfind_package(oUnit VERSION 2 OPTIONAL)
+#         set(LLVM_BINDINGS "${LLVM_BINDINGS} ocaml")
+#
+#         set(LLVM_OCAML_INSTALL_PATH "${OCAML_STDLIB_PATH}" CACHE STRING
+#             "Install directory for LLVM OCaml packages")
+#       else()
+#         message(STATUS "OCaml bindings disabled, need ctypes >=0.4.")
+#       endif()
+#     endif()
+#   endif()
+# endif()
 
-        set(LLVM_OCAML_INSTALL_PATH "${OCAML_STDLIB_PATH}" CACHE STRING
-            "Install directory for LLVM OCaml packages")
-      else()
-        message(STATUS "OCaml bindings disabled, need ctypes >=0.4.")
-      endif()
-    endif()
-  endif()
-endif()
+# string(REPLACE " " ";" LLVM_BINDINGS_LIST "${LLVM_BINDINGS}")
 
-string(REPLACE " " ";" LLVM_BINDINGS_LIST "${LLVM_BINDINGS}")
+# function(find_python_module module)
+#   string(REPLACE "." "_" module_name ${module})
+#   string(TOUPPER ${module_name} module_upper)
+#   set(FOUND_VAR PY_${module_upper}_FOUND)
+#   if (DEFINED ${FOUND_VAR})
+#     return()
+#   endif()
+#
+#   execute_process(COMMAND "${Python3_EXECUTABLE}" "-c" "import ${module}"
+#     RESULT_VARIABLE status
+#     ERROR_QUIET)
+#
+#   if(status)
+#     set(${FOUND_VAR} OFF CACHE BOOL "Failed to find python module '${module}'")
+#     message(STATUS "Could NOT find Python module ${module}")
+#   else()
+#   set(${FOUND_VAR} ON CACHE BOOL "Found python module '${module}'")
+#     message(STATUS "Found Python module ${module}")
+#   endif()
+# endfunction()
 
-function(find_python_module module)
-  string(REPLACE "." "_" module_name ${module})
-  string(TOUPPER ${module_name} module_upper)
-  set(FOUND_VAR PY_${module_upper}_FOUND)
-  if (DEFINED ${FOUND_VAR})
-    return()
-  endif()
+# set (PYTHON_MODULES
+#   pygments
+#   # Some systems still don't have pygments.lexers.c_cpp which was introduced in
+#   # version 2.0 in 2014...
+#   pygments.lexers.c_cpp
+#   yaml
+#   )
+# foreach(module ${PYTHON_MODULES})
+#   find_python_module(${module})
+# endforeach()
 
-  execute_process(COMMAND "${Python3_EXECUTABLE}" "-c" "import ${module}"
-    RESULT_VARIABLE status
-    ERROR_QUIET)
-
-  if(status)
-    set(${FOUND_VAR} OFF CACHE BOOL "Failed to find python module '${module}'")
-    message(STATUS "Could NOT find Python module ${module}")
-  else()
-  set(${FOUND_VAR} ON CACHE BOOL "Found python module '${module}'")
-    message(STATUS "Found Python module ${module}")
-  endif()
-endfunction()
-
-set (PYTHON_MODULES
-  pygments
-  # Some systems still don't have pygments.lexers.c_cpp which was introduced in
-  # version 2.0 in 2014...
-  pygments.lexers.c_cpp
-  yaml
-  )
-foreach(module ${PYTHON_MODULES})
-  find_python_module(${module})
-endforeach()
-
-if(PY_PYGMENTS_FOUND AND PY_PYGMENTS_LEXERS_C_CPP_FOUND AND PY_YAML_FOUND)
-  set (LLVM_HAVE_OPT_VIEWER_MODULES 1)
-else()
-  set (LLVM_HAVE_OPT_VIEWER_MODULES 0)
-endif()
+# if(PY_PYGMENTS_FOUND AND PY_PYGMENTS_LEXERS_C_CPP_FOUND AND PY_YAML_FOUND)
+#   set (LLVM_HAVE_OPT_VIEWER_MODULES 1)
+# else()
+#   set (LLVM_HAVE_OPT_VIEWER_MODULES 0)
+# endif()

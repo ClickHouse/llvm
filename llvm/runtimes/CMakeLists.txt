@@ -37,9 +37,10 @@ endfunction()
 
 include(LLVMExternalProjectUtils)
 
-if(NOT LLVM_BUILD_RUNTIMES)
+# ROB: LLVM_BUILD_RUNTIMES is OFF
+# if(NOT LLVM_BUILD_RUNTIMES)
   set(EXTRA_ARGS EXCLUDE_FROM_ALL)
-endif()
+# endif()
 
 function(check_apple_target triple builtin_or_runtime)
   set(error "\
@@ -207,9 +208,10 @@ function(runtime_default_target)
       ${runtime_name}
       install-${runtime_name}
       install-${runtime_name}-stripped)
-    if(LLVM_INCLUDE_TESTS)
-      list(APPEND test_targets check-${runtime_name})
-    endif()
+    # ROB: LLVM_INCLUDE_TESTS is OFF
+    # if(LLVM_INCLUDE_TESTS)
+    #   list(APPEND test_targets check-${runtime_name})
+    # endif()
   endforeach()
   foreach(component ${LLVM_RUNTIME_DISTRIBUTION_COMPONENTS})
     if(NOT ${component} IN_LIST SUB_COMPONENTS)
@@ -217,9 +219,10 @@ function(runtime_default_target)
     endif()
   endforeach()
 
-  if(LLVM_INCLUDE_TESTS)
-    list(APPEND test_targets runtimes-test-depends check-runtimes)
-  endif()
+  # ROB: LLVM_INCLUDE_TESTS is OFF
+  # if(LLVM_INCLUDE_TESTS)
+  #   list(APPEND test_targets runtimes-test-depends check-runtimes)
+  # endif()
 
   set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR_default ON)
   # AIX should fold 32-bit & 64-bit arch libraries into a single archive.
@@ -273,10 +276,11 @@ function(runtime_register_target name target)
     set(install-${runtime_name}-${name} install-${runtime_name})
     set(install-${runtime_name}-${name}-stripped install-${runtime_name}-stripped)
     list(APPEND ${name}_extra_targets ${runtime_name}-${name} install-${runtime_name}-${name} install-${runtime_name}-${name}-stripped)
-    if(LLVM_INCLUDE_TESTS)
-      set(check-${runtime_name}-${name} check-${runtime_name} )
-      list(APPEND ${name}_test_targets check-${runtime_name}-${name})
-    endif()
+    # ROB: LLVM_INCLUDE_TESTS is OFF
+    # if(LLVM_INCLUDE_TESTS)
+    #   set(check-${runtime_name}-${name} check-${runtime_name} )
+    #   list(APPEND ${name}_test_targets check-${runtime_name}-${name})
+    # endif()
   endforeach()
 
   foreach(target_name IN LISTS SUB_COMPONENTS SUB_INSTALL_TARGETS)
@@ -291,17 +295,18 @@ function(runtime_register_target name target)
     list(APPEND ${name}_extra_targets ${component}-${name} install-${component}-${name} install-${component}-${name}-stripped)
   endforeach()
 
-  if(LLVM_INCLUDE_TESTS)
-    set(runtimes-test-depends-${name} runtimes-test-depends)
-    set(check-runtimes-${name} check-runtimes)
-    list(APPEND ${name}_test_targets runtimes-test-depends-${name} check-runtimes-${name})
-    foreach(target_name IN LISTS SUB_CHECK_TARGETS)
-      set(${target_name}-${name} ${target_name})
-      list(APPEND ${name}_test_targets ${target_name}-${name})
-      list(APPEND test_targets ${target_name}-${name})
-    endforeach()
-    set(test_targets "${test_targets}" PARENT_SCOPE)
-  endif()
+  # ROB: LLVM_INCLUDE_TESTS is OFF
+  # if(LLVM_INCLUDE_TESTS)
+  #   set(runtimes-test-depends-${name} runtimes-test-depends)
+  #   set(check-runtimes-${name} check-runtimes)
+  #   list(APPEND ${name}_test_targets runtimes-test-depends-${name} check-runtimes-${name})
+  #   foreach(target_name IN LISTS SUB_CHECK_TARGETS)
+  #     set(${target_name}-${name} ${target_name})
+  #     list(APPEND ${name}_test_targets ${target_name}-${name})
+  #     list(APPEND test_targets ${target_name}-${name})
+  #   endforeach()
+  #   set(test_targets "${test_targets}" PARENT_SCOPE)
+  # endif()
 
   set(${name}_extra_args ${ARG_CMAKE_ARGS})
   get_cmake_property(variableNames VARIABLES)
@@ -377,11 +382,12 @@ if(runtimes)
       add_custom_target(runtimes-configure)
       add_custom_target(install-runtimes)
       add_custom_target(install-runtimes-stripped)
-      if(LLVM_INCLUDE_TESTS)
-        add_custom_target(check-runtimes)
-        add_custom_target(runtimes-test-depends)
-        set(test_targets "")
-      endif()
+      # ROB: LLVM_INCLUDE_TESTS is OFF
+      # if(LLVM_INCLUDE_TESTS)
+      #   add_custom_target(check-runtimes)
+      #   add_custom_target(runtimes-test-depends)
+      #   set(test_targets "")
+      # endif()
       foreach(runtime_name ${runtime_names})
         add_custom_target(${runtime_name})
         add_custom_target(install-${runtime_name})
@@ -404,10 +410,11 @@ if(runtimes)
       add_dependencies(runtimes-configure runtimes-${name}-configure)
       add_dependencies(install-runtimes install-runtimes-${name})
       add_dependencies(install-runtimes-stripped install-runtimes-${name}-stripped)
-      if(LLVM_INCLUDE_TESTS)
-        add_dependencies(check-runtimes check-runtimes-${name})
-        add_dependencies(runtimes-test-depends runtimes-test-depends-${name})
-      endif()
+      # ROB: LLVM_INCLUDE_TESTS is OFF
+      # if(LLVM_INCLUDE_TESTS)
+      #   add_dependencies(check-runtimes check-runtimes-${name})
+      #   add_dependencies(runtimes-test-depends runtimes-test-depends-${name})
+      # endif()
       foreach(runtime_name ${runtime_names})
         add_dependencies(${runtime_name} ${runtime_name}-${name})
         add_dependencies(install-${runtime_name} install-${runtime_name}-${name})
@@ -446,25 +453,26 @@ if(runtimes)
     add_dependencies(clang-bootstrap-deps runtimes)
   endif()
 
-  if(LLVM_INCLUDE_TESTS)
-    set_property(GLOBAL APPEND PROPERTY LLVM_ADDITIONAL_TEST_DEPENDS runtimes-test-depends)
-    set_property(GLOBAL APPEND PROPERTY LLVM_ADDITIONAL_TEST_TARGETS check-runtimes)
-
-    set(RUNTIMES_TEST_DEPENDS
-        FileCheck
-        count
-        llvm-nm
-        llvm-objdump
-        llvm-xray
-        not
-        obj2yaml
-        sancov
-        sanstats
-        gtest_main
-        gtest
-      )
-    foreach(target ${test_targets} ${SUB_CHECK_TARGETS})
-      add_dependencies(${target} ${RUNTIMES_TEST_DEPENDS})
-    endforeach()
-  endif()
+  # ROB: LLVM_INCLUDE_TESTS is OFF
+  # if(LLVM_INCLUDE_TESTS)
+  #   set_property(GLOBAL APPEND PROPERTY LLVM_ADDITIONAL_TEST_DEPENDS runtimes-test-depends)
+  #   set_property(GLOBAL APPEND PROPERTY LLVM_ADDITIONAL_TEST_TARGETS check-runtimes)
+  #
+  #   set(RUNTIMES_TEST_DEPENDS
+  #       FileCheck
+  #       count
+  #       llvm-nm
+  #       llvm-objdump
+  #       llvm-xray
+  #       not
+  #       obj2yaml
+  #       sancov
+  #       sanstats
+  #       gtest_main
+  #       gtest
+  #     )
+  #   foreach(target ${test_targets} ${SUB_CHECK_TARGETS})
+  #     add_dependencies(${target} ${RUNTIMES_TEST_DEPENDS})
+  #   endforeach()
+  # endif()
 endif()

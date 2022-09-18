@@ -1,17 +1,17 @@
-if (DEFINED LLVM_HAVE_TF_AOT OR DEFINED LLVM_HAVE_TF_API)
-  if (DEFINED LLVM_HAVE_TF_AOT)
-    include(TensorFlowCompile)
-    tfcompile(models/inliner serve action InlinerSizeModel llvm::InlinerSizeModel)
-    list(APPEND GeneratedMLSources
-      $<TARGET_OBJECTS:tf_xla_runtime_objects>
-      ${GENERATED_OBJS}
-    )
-  endif()
-
-  if (DEFINED LLVM_HAVE_TF_API)
-    LIST(APPEND MLLinkDeps ${tensorflow_c_api})
-  endif()
-endif()
+# if (DEFINED LLVM_HAVE_TF_AOT OR DEFINED LLVM_HAVE_TF_API)
+#   if (DEFINED LLVM_HAVE_TF_AOT)
+#     include(TensorFlowCompile)
+#     tfcompile(models/inliner serve action InlinerSizeModel llvm::InlinerSizeModel)
+#     list(APPEND GeneratedMLSources
+#       $<TARGET_OBJECTS:tf_xla_runtime_objects>
+#       ${GENERATED_OBJS}
+#     )
+#   endif()
+#
+#   if (DEFINED LLVM_HAVE_TF_API)
+#     LIST(APPEND MLLinkDeps ${tensorflow_c_api})
+#   endif()
+# endif()
 
 add_llvm_component_library(LLVMAnalysis
   AliasAnalysis.cpp
