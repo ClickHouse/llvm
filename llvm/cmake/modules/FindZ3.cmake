@@ -1,37 +1,37 @@
 INCLUDE(CheckCXXSourceRuns)
 
 # Function to check Z3's version
-function(check_z3_version z3_include z3_lib)
-  # The program that will be executed to print Z3's version.
-  file(WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testz3.c
-       "#include <assert.h>
-        #include <z3.h>
-        int main() {
-          unsigned int major, minor, build, rev;
-          Z3_get_version(&major, &minor, &build, &rev);
-          printf(\"%u.%u.%u\", major, minor, build);
-          return 0;
-       }")
-
-  # Get lib path
-  get_filename_component(z3_lib_path ${z3_lib} PATH)
-
-  try_run(
-    Z3_RETURNCODE
-    Z3_COMPILED
-    ${CMAKE_BINARY_DIR}
-    ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testz3.c
-    COMPILE_DEFINITIONS -I"${z3_include}"
-    LINK_LIBRARIES -L${z3_lib_path} -lz3
-    RUN_OUTPUT_VARIABLE SRC_OUTPUT
-  )
-
-  if(Z3_COMPILED)
-    string(REGEX REPLACE "([0-9]*\\.[0-9]*\\.[0-9]*)" "\\1"
-           z3_version "${SRC_OUTPUT}")
-    set(Z3_VERSION_STRING ${z3_version} PARENT_SCOPE)
-  endif()
-endfunction(check_z3_version)
+# function(check_z3_version z3_include z3_lib)
+#   # The program that will be executed to print Z3's version.
+#   file(WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testz3.c
+#        "#include <assert.h>
+#         #include <z3.h>
+#         int main() {
+#           unsigned int major, minor, build, rev;
+#           Z3_get_version(&major, &minor, &build, &rev);
+#           printf(\"%u.%u.%u\", major, minor, build);
+#           return 0;
+#        }")
+#
+#   # Get lib path
+#   get_filename_component(z3_lib_path ${z3_lib} PATH)
+#
+#   try_run(
+#     Z3_RETURNCODE
+#     Z3_COMPILED
+#     ${CMAKE_BINARY_DIR}
+#     ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testz3.c
+#     COMPILE_DEFINITIONS -I"${z3_include}"
+#     LINK_LIBRARIES -L${z3_lib_path} -lz3
+#     RUN_OUTPUT_VARIABLE SRC_OUTPUT
+#   )
+#
+#   if(Z3_COMPILED)
+#     string(REGEX REPLACE "([0-9]*\\.[0-9]*\\.[0-9]*)" "\\1"
+#            z3_version "${SRC_OUTPUT}")
+#     set(Z3_VERSION_STRING ${z3_version} PARENT_SCOPE)
+#   endif()
+# endfunction(check_z3_version)
 
 # Looking for Z3 in LLVM_Z3_INSTALL_DIR
 find_path(Z3_INCLUDE_DIR NAMES z3.h
@@ -60,11 +60,11 @@ unset(Z3_VERSION_STRING)
 
 # First, try to check it dynamically, by compiling a small program that
 # prints Z3's version
-if(Z3_INCLUDE_DIR AND Z3_LIBRARIES)
-  # We do not have the Z3 binary to query for a version. Try to use
-  # a small C++ program to detect it via the Z3_get_version() API call.
-  check_z3_version(${Z3_INCLUDE_DIR} ${Z3_LIBRARIES})
-endif()
+# if(Z3_INCLUDE_DIR AND Z3_LIBRARIES)
+#   # We do not have the Z3 binary to query for a version. Try to use
+#   # a small C++ program to detect it via the Z3_get_version() API call.
+#   check_z3_version(${Z3_INCLUDE_DIR} ${Z3_LIBRARIES})
+# endif()
 
 # If the dynamic check fails, we might be cross compiling: if that's the case,
 # check the version in the headers, otherwise, fail with a message

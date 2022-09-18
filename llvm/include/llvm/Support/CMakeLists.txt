@@ -5,16 +5,17 @@ set(version_inc "${CMAKE_CURRENT_BINARY_DIR}/VCSRevision.h")
 
 set(generate_vcs_version_script "${LLVM_CMAKE_PATH}/GenerateVersionFromVCS.cmake")
 
-if(LLVM_APPEND_VC_REV)
-  set(llvm_source_dir ${LLVM_MAIN_SRC_DIR})
-
-  # A fake version file and is not expected to exist. It is being used to
-  # force regeneration of VCSRevision.h for source directory with no write
-  # permission available.
-  if (llvm_vc STREQUAL "")
-    set(fake_version_inc "${CMAKE_CURRENT_BINARY_DIR}/__FakeVCSRevision.h")
-  endif()
-endif()
+# ROB: LLVM_APPEND_VC_REV is OFF
+# if(LLVM_APPEND_VC_REV)
+#   set(llvm_source_dir ${LLVM_MAIN_SRC_DIR})
+#
+#   # A fake version file and is not expected to exist. It is being used to
+#   # force regeneration of VCSRevision.h for source directory with no write
+#   # permission available.
+#   if (llvm_vc STREQUAL "")
+#     set(fake_version_inc "${CMAKE_CURRENT_BINARY_DIR}/__FakeVCSRevision.h")
+#   endif()
+# endif()
 
 set(generated_files "${version_inc}")
 if (fake_version_inc)

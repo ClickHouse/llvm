@@ -113,11 +113,11 @@ endfunction(explicit_llvm_config)
 
 
 # This is Deprecated
-function(llvm_map_components_to_libraries OUT_VAR)
-  message(AUTHOR_WARNING "Using llvm_map_components_to_libraries() is deprecated. Use llvm_map_components_to_libnames() instead")
-  explicit_map_components_to_libraries(result ${ARGN})
-  set( ${OUT_VAR} ${result} ${sys_result} PARENT_SCOPE )
-endfunction(llvm_map_components_to_libraries)
+# function(llvm_map_components_to_libraries OUT_VAR)
+#   message(AUTHOR_WARNING "Using llvm_map_components_to_libraries() is deprecated. Use llvm_map_components_to_libnames() instead")
+#   explicit_map_components_to_libraries(result ${ARGN})
+#   set( ${OUT_VAR} ${result} ${sys_result} PARENT_SCOPE )
+# endfunction(llvm_map_components_to_libraries)
 
 # Expand pseudo-components into real components.
 # Does not cover 'native', 'backend', or 'engine' as these require special
@@ -298,61 +298,61 @@ endfunction()
 # Perform a post-order traversal of the dependency graph.
 # This duplicates the algorithm used by llvm-config, originally
 # in tools/llvm-config/llvm-config.cpp, function ComputeLibsForComponents.
-function(expand_topologically name required_libs visited_libs)
-  list(FIND visited_libs ${name} found)
-  if( found LESS 0 )
-    list(APPEND visited_libs ${name})
-    set(visited_libs ${visited_libs} PARENT_SCOPE)
+# function(expand_topologically name required_libs visited_libs)
+#   list(FIND visited_libs ${name} found)
+#   if( found LESS 0 )
+#     list(APPEND visited_libs ${name})
+#     set(visited_libs ${visited_libs} PARENT_SCOPE)
+#
+#     #
+#     get_property(libname GLOBAL PROPERTY LLVM_COMPONENT_NAME_${name})
+#     if(libname)
+#       set(cname LLVM${libname})
+#     elseif(TARGET ${name})
+#       set(cname ${name})
+#     elseif(TARGET LLVM${name})
+#       set(cname LLVM${name})
+#     else()
+#       message(FATAL_ERROR "unknown component ${name}")
+#     endif()
+#
+#     get_property(lib_deps TARGET ${cname} PROPERTY LLVM_LINK_COMPONENTS)
+#     foreach( lib_dep ${lib_deps} )
+#       expand_topologically(${lib_dep} "${required_libs}" "${visited_libs}")
+#       set(required_libs ${required_libs} PARENT_SCOPE)
+#       set(visited_libs ${visited_libs} PARENT_SCOPE)
+#     endforeach()
+#
+#     list(APPEND required_libs ${cname})
+#     set(required_libs ${required_libs} PARENT_SCOPE)
+#   endif()
+# endfunction()
 
-    #
-    get_property(libname GLOBAL PROPERTY LLVM_COMPONENT_NAME_${name})
-    if(libname)
-      set(cname LLVM${libname})
-    elseif(TARGET ${name})
-      set(cname ${name})
-    elseif(TARGET LLVM${name})
-      set(cname LLVM${name})
-    else()
-      message(FATAL_ERROR "unknown component ${name}")
-    endif()
+# # Expand dependencies while topologically sorting the list of libraries:
+# function(llvm_expand_dependencies out_libs)
+#   set(expanded_components ${ARGN})
+#
+#   set(required_libs)
+#   set(visited_libs)
+#   foreach( lib ${expanded_components} )
+#     expand_topologically(${lib} "${required_libs}" "${visited_libs}")
+#   endforeach()
+#
+#   if(required_libs)
+#     list(REVERSE required_libs)
+#   endif()
+#   set(${out_libs} ${required_libs} PARENT_SCOPE)
+# endfunction()
 
-    get_property(lib_deps TARGET ${cname} PROPERTY LLVM_LINK_COMPONENTS)
-    foreach( lib_dep ${lib_deps} )
-      expand_topologically(${lib_dep} "${required_libs}" "${visited_libs}")
-      set(required_libs ${required_libs} PARENT_SCOPE)
-      set(visited_libs ${visited_libs} PARENT_SCOPE)
-    endforeach()
-
-    list(APPEND required_libs ${cname})
-    set(required_libs ${required_libs} PARENT_SCOPE)
-  endif()
-endfunction()
-
-# Expand dependencies while topologically sorting the list of libraries:
-function(llvm_expand_dependencies out_libs)
-  set(expanded_components ${ARGN})
-
-  set(required_libs)
-  set(visited_libs)
-  foreach( lib ${expanded_components} )
-    expand_topologically(${lib} "${required_libs}" "${visited_libs}")
-  endforeach()
-
-  if(required_libs)
-    list(REVERSE required_libs)
-  endif()
-  set(${out_libs} ${required_libs} PARENT_SCOPE)
-endfunction()
-
-function(explicit_map_components_to_libraries out_libs)
-  llvm_map_components_to_libnames(link_libs ${ARGN})
-  llvm_expand_dependencies(expanded_components ${link_libs})
-  # Return just the libraries included in this build:
-  set(result)
-  foreach(c ${expanded_components})
-    if( TARGET ${c} )
-      set(result ${result} ${c})
-    endif()
-  endforeach(c)
-  set(${out_libs} ${result} PARENT_SCOPE)
-endfunction(explicit_map_components_to_libraries)
+# function(explicit_map_components_to_libraries out_libs)
+#   llvm_map_components_to_libnames(link_libs ${ARGN})
+#   llvm_expand_dependencies(expanded_components ${link_libs})
+#   # Return just the libraries included in this build:
+#   set(result)
+#   foreach(c ${expanded_components})
+#     if( TARGET ${c} )
+#       set(result ${result} ${c})
+#     endif()
+#   endforeach(c)
+#   set(${out_libs} ${result} PARENT_SCOPE)
+# endfunction(explicit_map_components_to_libraries)

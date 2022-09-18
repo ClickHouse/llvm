@@ -21,6 +21,7 @@ add_llvm_component_library(LLVMInterpreter
   Support
   )
 
-if( LLVM_ENABLE_FFI )
-  target_link_libraries( LLVMInterpreter PRIVATE ${FFI_LIBRARY_PATH} )
-endif()
+# ROB: LLVM_ENABLE_FFI is OFF
+# if( LLVM_ENABLE_FFI )
+#   target_link_libraries( LLVMInterpreter PRIVATE ${FFI_LIBRARY_PATH} )
+# endif()

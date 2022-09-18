@@ -24,9 +24,10 @@ if(DEFINED LLVM_COMPILER_CHECKED)
 endif()
 set(LLVM_COMPILER_CHECKED ON)
 
-if(LLVM_FORCE_USE_OLD_TOOLCHAIN)
-  return()
-endif()
+# ROB: LLVM_FORCE_USE_OLD_TOOLCHAIN is OFF
+# if(LLVM_FORCE_USE_OLD_TOOLCHAIN)
+#   return()
+# endif()
 
 function(check_compiler_version NAME NICE_NAME MINIMUM_VERSION SOFT_ERROR_VERSION)
   if(NOT CMAKE_CXX_COMPILER_ID STREQUAL NAME)
@@ -35,11 +36,12 @@ function(check_compiler_version NAME NICE_NAME MINIMUM_VERSION SOFT_ERROR_VERSIO
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_VERSION)
     message(FATAL_ERROR "Host ${NICE_NAME} version must be at least ${MINIMUM_VERSION}, your version is ${CMAKE_CXX_COMPILER_VERSION}.")
   elseif(CMAKE_CXX_COMPILER_VERSION VERSION_LESS SOFT_ERROR_VERSION)
-    if(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN)
-      message(WARNING "Host ${NICE_NAME} version should be at least ${SOFT_ERROR_VERSION} because LLVM will soon use new C++ features which your toolchain version doesn't support. Your version is ${CMAKE_CXX_COMPILER_VERSION}. Ignoring because you've set LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN, but very soon your toolchain won't be supported.")
-    else()
+    # ROB: LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN is OFF
+    # if(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN)
+    #   message(WARNING "Host ${NICE_NAME} version should be at least ${SOFT_ERROR_VERSION} because LLVM will soon use new C++ features which your toolchain version doesn't support. Your version is ${CMAKE_CXX_COMPILER_VERSION}. Ignoring because you've set LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN, but very soon your toolchain won't be supported.")
+    # else()
       message(FATAL_ERROR "Host ${NICE_NAME} version should be at least ${SOFT_ERROR_VERSION} because LLVM will soon use new C++ features which your toolchain version doesn't support. Your version is ${CMAKE_CXX_COMPILER_VERSION}. You can temporarily opt out using LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN, but very soon your toolchain won't be supported.")
-    endif()
+    # endif()
   endif()
 endfunction(check_compiler_version)
 
@@ -51,15 +53,16 @@ check_compiler_version("MSVC" "Visual Studio" ${MSVC_MIN} ${MSVC_SOFT_ERROR})
 # See https://developercommunity.visualstudio.com/content/problem/845933/miscompile-boolean-condition-deduced-to-be-always.html
 # and thread "[llvm-dev] Longstanding failing tests - clang-tidy, MachO, Polly"
 # on llvm-dev Jan 21-23 2020.
-if ((${CMAKE_CXX_COMPILER_ID} STREQUAL MSVC) AND
-    (19.24 VERSION_LESS_EQUAL ${CMAKE_CXX_COMPILER_VERSION}) AND
-    (${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 19.25))
-  if(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN)
-    message(WARNING "Host Visual Studio version 16.4 is known to miscompile part of LLVM")
-  else()
-    message(FATAL_ERROR "Host Visual Studio version 16.4 is known to miscompile part of LLVM, please use clang-cl or upgrade to 16.5 or above (use -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON to ignore)")
-  endif()
-endif()
+# if ((${CMAKE_CXX_COMPILER_ID} STREQUAL MSVC) AND
+#     (19.24 VERSION_LESS_EQUAL ${CMAKE_CXX_COMPILER_VERSION}) AND
+#     (${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 19.25))
+#   # ROB: LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN is OFF
+#   # if(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN)
+#   #   message(WARNING "Host Visual Studio version 16.4 is known to miscompile part of LLVM")
+#   # else()
+#     message(FATAL_ERROR "Host Visual Studio version 16.4 is known to miscompile part of LLVM, please use clang-cl or upgrade to 16.5 or above (use -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON to ignore)")
+#   # endif()
+# endif()
 
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -69,6 +72,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     endif()
     set(CLANG_CL 1)
   elseif(NOT LLVM_ENABLE_LIBCXX)
+    # ROB: LLVM_ENABLE_LIBCXX is OFF
     set (LLVM_LIBSTDCXX_MIN 1)
     set (LLVM_LIBSTDCXX_SOFT_ERROR 1)
   endif()
